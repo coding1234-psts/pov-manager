@@ -1,0 +1,10 @@
+// Copy to `init-mongo.js`. Use the same user/password/db as in `.env`:
+// MONGO_INITDB_ROOT_USERNAME, MONGO_INITDB_ROOT_PASSWORD, MONGO_INITDB_DATABASE,
+// and Django MONGO_USER / MONGO_PASSWORD / MONGO_DB_NAME.
+db.createUser({
+  user: "root",
+  pwd: "change-me",
+  roles: [
+    { role: "readWrite", db: "pov_manager" }
+  ]
+});

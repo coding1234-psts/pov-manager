@@ -1,0 +1,7 @@
+-- Skipped when using docker-compose postgres service: POSTGRES_USER / POSTGRES_PASSWORD /
+-- POSTGRES_DB already create the role and database on first start.
+-- Uncomment below only if you run Postgres without those env vars and need manual bootstrap.
+--
+-- CREATE DATABASE <database-name>;
+-- CREATE USER <username> WITH ENCRYPTED PASSWORD '<password>';
+-- GRANT ALL PRIVILEGES ON DATABASE <database-name> TO <username>;

@@ -1,0 +1,1646 @@
+[
+  {
+    "id": 10006,
+    "actions_approver": "",
+    "age": 2136,
+    "all_services": [
+      {
+        "id": "7fda8450-dedf-476d-aadd-0d43042522b6",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2021-02-09T20:45:30Z",
+        "requested_at": null,
+        "granted_at": "2021-02-09T20:45:30Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "allow_response_actions": false,
+    "created_at": "2019-04-22T19:44:19Z",
+    "data_retention_months": 12,
+    "description": "Tenant description",
+    "domain": "",
+    "domain_normalized": "",
+    "enabled": false,
+    "enabled_in_pilot": false,
+    "enabled_in_production": false,
+    "enabled_on_delta": false,
+    "enabled_on_echo": false,
+    "enabled_on_foxtrot": false,
+    "enabled_on_prod": false,
+    "environments": [
+      {
+        "id": "68310521-8662-45bf-813a-bc6ab6a1fd71",
+        "created_at": "2019-04-22T19:44:19Z",
+        "updated_at": "2019-04-22T19:44:19Z",
+        "tenant_id": "0",
+        "name": "production",
+        "enabled": false
+      }
+    ],
+    "expires_at": null,
+    "granted_services": [
+      {
+        "id": "7fda8450-dedf-476d-aadd-0d43042522b6",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2021-02-09T20:45:30Z",
+        "requested_at": null,
+        "granted_at": "2021-02-09T20:45:30Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "is_organization": false,
+    "is_partner": false,
+    "labels": [
+      {
+        "id": "16",
+        "tenant_id": "10006",
+        "name": "ctp_client_id",
+        "value": "5945491",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "17",
+        "tenant_id": "10006",
+        "name": "red_cloak_id",
+        "value": "23259bbb",
+        "owner_partner_tenant_id": "5000"
+      }
+    ],
+    "name": "Tenant 1",
+    "name_normalized": "tenant-1",
+    "organization": null,
+    "organization_name": null,
+    "parent": "5000",
+    "partner": "5000",
+    "partner_name": "All Tenants",
+    "partner_ship": null,
+    "post_disablement_complete": false,
+    "requested_services": [],
+    "services": null,
+    "support_enabled": false,
+    "updated_at": "2024-04-16T15:48:46Z"
+  },
+  {
+    "id": 10007,
+    "actions_approver": "",
+    "age": 1477,
+    "all_services": [
+      {
+        "id": "70fd1efd-958f-494b-97f3-44b1d0ed528f",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-06-25T13:42:33Z",
+        "updated_at": "2024-06-25T13:42:33Z",
+        "requested_at": null,
+        "granted_at": "2024-06-25T13:42:33Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "bfec9305-6b17-11eb-98c1-020fff5a091e",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2024-06-25T13:42:33Z",
+        "requested_at": null,
+        "granted_at": "2024-06-25T13:42:33Z",
+        "revoked_at": "2024-06-25T13:42:33Z",
+        "requested_by": null
+      }
+    ],
+    "allow_response_actions": false,
+    "created_at": "2021-02-09T20:45:30Z",
+    "data_retention_months": 1,
+    "description": "Tenant description",
+    "domain": "",
+    "domain_normalized": "",
+    "enabled": false,
+    "enabled_in_pilot": true,
+    "enabled_in_production": false,
+    "enabled_on_delta": false,
+    "enabled_on_echo": false,
+    "enabled_on_foxtrot": false,
+    "enabled_on_prod": false,
+    "environments": [
+      {
+        "id": "7b0f089f-3653-42e0-b25b-353f9ceab1b2",
+        "created_at": "2024-04-19T13:32:44Z",
+        "updated_at": "2024-04-19T13:32:44Z",
+        "tenant_id": "0",
+        "name": "pilot",
+        "enabled": true
+      },
+      {
+        "id": "ff790211-da86-4e41-860b-cbf071be6767",
+        "created_at": "2019-04-22T19:44:19Z",
+        "updated_at": "2021-05-22T02:46:45Z",
+        "tenant_id": "0",
+        "name": "production",
+        "enabled": false
+      }
+    ],
+    "expires_at": null,
+    "granted_services": [
+      {
+        "id": "70fd1efd-958f-494b-97f3-44b1d0ed528f",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-06-25T13:42:33Z",
+        "updated_at": "2024-06-25T13:42:33Z",
+        "requested_at": null,
+        "granted_at": "2024-06-25T13:42:33Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "is_organization": false,
+    "is_partner": false,
+    "labels": [
+      {
+        "id": "18",
+        "tenant_id": "10007",
+        "name": "ctp_client_id",
+        "value": "5539945",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "19",
+        "tenant_id": "10007",
+        "name": "red_cloak_id",
+        "value": "52247115",
+        "owner_partner_tenant_id": "5000"
+      }
+    ],
+    "name": "Tenant 2",
+    "name_normalized": "tenant-2",
+    "organization": null,
+    "organization_name": null,
+    "parent": "5000",
+    "partner": "5000",
+    "partner_name": "All Tenants",
+    "partner_ship": null,
+    "post_disablement_complete": false,
+    "requested_services": [],
+    "services": null,
+    "support_enabled": false,
+    "updated_at": "2024-06-25T13:42:33Z"
+  },
+  {
+    "id": 10002,
+    "actions_approver": "",
+    "age": 2136,
+    "all_services": [
+      {
+        "id": "51eea2ed-b43d-4e0f-b03b-51e2da5e87ec",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-05-31T17:14:56Z",
+        "updated_at": "2024-05-31T17:14:56Z",
+        "requested_at": null,
+        "granted_at": "2024-05-31T17:14:56Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "bfd8d4ba-6b17-11eb-98c1-020fff5a091e",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2024-05-31T17:14:56Z",
+        "requested_at": null,
+        "granted_at": "2024-05-31T17:14:56Z",
+        "revoked_at": "2024-05-31T17:14:56Z",
+        "requested_by": null
+      }
+    ],
+    "allow_response_actions": false,
+    "created_at": "2019-04-22T19:44:18Z",
+    "data_retention_months": 1,
+    "description": "Tenant description",
+    "domain": "",
+    "domain_normalized": "",
+    "enabled": false,
+    "enabled_in_pilot": false,
+    "enabled_in_production": false,
+    "enabled_on_delta": false,
+    "enabled_on_echo": false,
+    "enabled_on_foxtrot": false,
+    "enabled_on_prod": false,
+    "environments": [
+      {
+        "id": "3511754c-0bde-495c-a001-6b2446bcad11",
+        "created_at": "2019-04-22T19:44:18Z",
+        "updated_at": "2019-04-22T19:44:18Z",
+        "tenant_id": "0",
+        "name": "production",
+        "enabled": false
+      }
+    ],
+    "expires_at": null,
+    "granted_services": [
+      {
+        "id": "51eea2ed-b43d-4e0f-b03b-51e2da5e87ec",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-05-31T17:14:56Z",
+        "updated_at": "2024-05-31T17:14:56Z",
+        "requested_at": null,
+        "granted_at": "2024-05-31T17:14:56Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "is_organization": false,
+    "is_partner": false,
+    "labels": [
+      {
+        "id": "8",
+        "tenant_id": "10002",
+        "name": "ctp_client_id",
+        "value": "5590877",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "9",
+        "tenant_id": "10002",
+        "name": "red_cloak_id",
+        "value": "5e95c9c8",
+        "owner_partner_tenant_id": "5000"
+      }
+    ],
+    "name": "Tenant 3",
+    "name_normalized": "tenant-3",
+    "organization": null,
+    "organization_name": null,
+    "parent": "5000",
+    "partner": "5000",
+    "partner_name": "All Tenants",
+    "partner_ship": null,
+    "post_disablement_complete": false,
+    "requested_services": [],
+    "services": null,
+    "support_enabled": false,
+    "updated_at": "2024-05-31T17:14:56Z"
+  },
+  {
+    "id": 10005,
+    "actions_approver": "email123@sophos.com",
+    "age": 1477,
+    "all_services": [
+      {
+        "id": "a10e2db0-2a20-43fc-87d1-075c36eb3d04",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-09-06T12:12:06Z",
+        "updated_at": "2024-09-06T12:12:06Z",
+        "requested_at": null,
+        "granted_at": "2024-09-06T12:12:06Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "bff9f733-6b17-11eb-98c1-020fff5a091e",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2024-09-06T12:12:07Z",
+        "requested_at": null,
+        "granted_at": "2024-09-06T12:12:07Z",
+        "revoked_at": "2024-09-06T12:12:07Z",
+        "requested_by": null
+      },
+      {
+        "id": "0ca2382a-5321-42f9-b57a-393ce518d759",
+        "service_id": "1fc0b64b-2534-4b6c-8fc7-7599a2300524",
+        "name": "DISABLED",
+        "description": "Customer no longer subscribes to services.",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-07-30T13:59:25Z",
+        "updated_at": "2024-07-30T13:59:25Z",
+        "requested_at": null,
+        "granted_at": "2024-07-30T13:59:25Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "86bc299c-4fc4-4977-aee0-5fdcd614c88f",
+        "service_id": "1cf361b7-e229-4a6c-b434-6fa41339279d",
+        "name": "Licensed Data Volume",
+        "description": "Based on Licensing",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-01-20T16:50:04Z",
+        "updated_at": "2023-01-20T16:50:04Z",
+        "requested_at": null,
+        "granted_at": "2023-01-20T16:50:04Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "75b3e1a0-db25-416b-bee3-c70bdaeb33a1",
+        "service_id": "d14ce9ee-17a7-4f6f-a680-e065b12f81cd",
+        "name": "MDR",
+        "description": "Managed Detection and Response Service",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2022-08-29T09:32:53Z",
+        "updated_at": "2024-07-30T13:59:16Z",
+        "requested_at": null,
+        "granted_at": "2024-07-30T13:59:16Z",
+        "revoked_at": "2024-07-30T13:59:16Z",
+        "requested_by": null
+      },
+      {
+        "id": "74842e83-32eb-43fc-8435-cb6179f5616d",
+        "service_id": "10adf232-cc2a-4105-acab-c2f2f4222a56",
+        "name": "Network Detection and Response",
+        "description": "Network Detection and Response customer",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-10-03T16:59:15Z",
+        "updated_at": "2024-10-03T16:59:15Z",
+        "requested_at": null,
+        "granted_at": "2024-10-03T16:59:15Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "f1fbc6f5-3ed0-4fff-81aa-d98d52444951",
+        "service_id": "ebf23f41-8ca2-4cad-89df-ab8fea3dd4e9",
+        "name": "Unlimited Response",
+        "description": "Customers who have signed up for Unlimited Response",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-07-12T12:28:40Z",
+        "updated_at": "2024-07-30T13:59:18Z",
+        "requested_at": null,
+        "granted_at": "2024-07-30T13:59:18Z",
+        "revoked_at": "2024-07-30T13:59:18Z",
+        "requested_by": null
+      }
+    ],
+    "allow_response_actions": false,
+    "created_at": "2021-02-09T20:45:30Z",
+    "data_retention_months": 1,
+    "description": "The Future Group",
+    "domain": "",
+    "domain_normalized": "",
+    "enabled": false,
+    "enabled_in_pilot": false,
+    "enabled_in_production": false,
+    "enabled_on_delta": false,
+    "enabled_on_echo": false,
+    "enabled_on_foxtrot": false,
+    "enabled_on_prod": false,
+    "environments": [
+      {
+        "id": "b4ca55ad-cc90-45b1-8c5a-f736bbc29e7f",
+        "created_at": "2024-04-19T13:32:44Z",
+        "updated_at": "2024-07-30T13:59:25Z",
+        "tenant_id": "0",
+        "name": "pilot",
+        "enabled": false
+      },
+      {
+        "id": "75a1dd7b-7917-43bd-8d85-d4d777c98e98",
+        "created_at": "2019-04-22T19:44:19Z",
+        "updated_at": "2024-07-30T13:59:25Z",
+        "tenant_id": "0",
+        "name": "production",
+        "enabled": false
+      }
+    ],
+    "expires_at": null,
+    "granted_services": [
+      {
+        "id": "a10e2db0-2a20-43fc-87d1-075c36eb3d04",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-09-06T12:12:06Z",
+        "updated_at": "2024-09-06T12:12:06Z",
+        "requested_at": null,
+        "granted_at": "2024-09-06T12:12:06Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "0ca2382a-5321-42f9-b57a-393ce518d759",
+        "service_id": "1fc0b64b-2534-4b6c-8fc7-7599a2300524",
+        "name": "DISABLED",
+        "description": "Customer no longer subscribes to services.",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-07-30T13:59:25Z",
+        "updated_at": "2024-07-30T13:59:25Z",
+        "requested_at": null,
+        "granted_at": "2024-07-30T13:59:25Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "86bc299c-4fc4-4977-aee0-5fdcd614c88f",
+        "service_id": "1cf361b7-e229-4a6c-b434-6fa41339279d",
+        "name": "Licensed Data Volume",
+        "description": "Based on Licensing",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-01-20T16:50:04Z",
+        "updated_at": "2023-01-20T16:50:04Z",
+        "requested_at": null,
+        "granted_at": "2023-01-20T16:50:04Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "74842e83-32eb-43fc-8435-cb6179f5616d",
+        "service_id": "10adf232-cc2a-4105-acab-c2f2f4222a56",
+        "name": "Network Detection and Response",
+        "description": "Network Detection and Response customer",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-10-03T16:59:15Z",
+        "updated_at": "2024-10-03T16:59:15Z",
+        "requested_at": null,
+        "granted_at": "2024-10-03T16:59:15Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "is_organization": false,
+    "is_partner": false,
+    "labels": [
+      {
+        "id": "14",
+        "tenant_id": "10005",
+        "name": "ctp_client_id",
+        "value": "5656875",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "15",
+        "tenant_id": "10005",
+        "name": "red_cloak_id",
+        "value": "d0caa446",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "198841",
+        "tenant_id": "10005",
+        "name": "account_number",
+        "value": "305300",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "509613",
+        "tenant_id": "10005",
+        "name": "industry",
+        "value": "Misc. Financial",
+        "owner_partner_tenant_id": "5000"
+      }
+    ],
+    "name": "Tenant 4",
+    "name_normalized": "tenant-4",
+    "organization": null,
+    "organization_name": null,
+    "parent": "5000",
+    "partner": "5000",
+    "partner_name": "All Tenants",
+    "partner_ship": null,
+    "post_disablement_complete": false,
+    "requested_services": [],
+    "services": null,
+    "support_enabled": false,
+    "updated_at": "2024-10-03T16:59:15Z"
+  },
+  {
+    "id": 10003,
+    "actions_approver": "",
+    "age": 2136,
+    "all_services": [
+      {
+        "id": "bfc5c987-6b17-11eb-98c1-020fff5a091e",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2021-02-09T20:45:30Z",
+        "requested_at": null,
+        "granted_at": "2021-02-09T20:45:30Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "f80c85d8-dc58-46cd-9f0d-a94c28391f6f",
+        "service_id": "1fc0b64b-2534-4b6c-8fc7-7599a2300524",
+        "name": "DISABLED",
+        "description": "Customer no longer subscribes to services.",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-11-09T08:23:01Z",
+        "updated_at": "2023-11-09T08:23:01Z",
+        "requested_at": null,
+        "granted_at": "2023-11-09T08:23:01Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "allow_response_actions": false,
+    "created_at": "2019-04-22T19:44:18Z",
+    "data_retention_months": 12,
+    "description": "Tenant description",
+    "domain": "",
+    "domain_normalized": "",
+    "enabled": true,
+    "enabled_in_pilot": false,
+    "enabled_in_production": false,
+    "enabled_on_delta": false,
+    "enabled_on_echo": false,
+    "enabled_on_foxtrot": false,
+    "enabled_on_prod": false,
+    "environments": [
+      {
+        "id": "c69f3060-b415-4580-94a6-4759f5d9dca5",
+        "created_at": "2019-04-22T19:44:19Z",
+        "updated_at": "2019-04-22T19:44:19Z",
+        "tenant_id": "0",
+        "name": "production",
+        "enabled": false
+      }
+    ],
+    "expires_at": null,
+    "granted_services": [
+      {
+        "id": "bfc5c987-6b17-11eb-98c1-020fff5a091e",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2021-02-09T20:45:30Z",
+        "requested_at": null,
+        "granted_at": "2021-02-09T20:45:30Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "f80c85d8-dc58-46cd-9f0d-a94c28391f6f",
+        "service_id": "1fc0b64b-2534-4b6c-8fc7-7599a2300524",
+        "name": "DISABLED",
+        "description": "Customer no longer subscribes to services.",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-11-09T08:23:01Z",
+        "updated_at": "2023-11-09T08:23:01Z",
+        "requested_at": null,
+        "granted_at": "2023-11-09T08:23:01Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "is_organization": false,
+    "is_partner": false,
+    "labels": [
+      {
+        "id": "11",
+        "tenant_id": "10003",
+        "name": "red_cloak_id",
+        "value": "16c00fdc",
+        "owner_partner_tenant_id": "5000"
+      }
+    ],
+    "name": "Tenant 5",
+    "name_normalized": "tenant-5`",
+    "organization": null,
+    "organization_name": null,
+    "parent": "5000",
+    "partner": "5000",
+    "partner_name": "All Tenants",
+    "partner_ship": null,
+    "post_disablement_complete": false,
+    "requested_services": [],
+    "services": null,
+    "support_enabled": false,
+    "updated_at": "2023-11-09T08:23:01Z"
+  },
+  {
+    "id": 10001,
+    "actions_approver": "",
+    "age": 2136,
+    "all_services": [
+      {
+        "id": "b42d014f-a7cb-4b8c-b6bc-ac5fb5cca24f",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-05-31T18:34:25Z",
+        "updated_at": "2024-05-31T18:34:25Z",
+        "requested_at": null,
+        "granted_at": "2024-05-31T18:34:25Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "bff071ec-6b17-11eb-98c1-020fff5a091e",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2024-05-31T18:34:25Z",
+        "requested_at": null,
+        "granted_at": "2024-05-31T18:34:25Z",
+        "revoked_at": "2024-05-31T18:34:25Z",
+        "requested_by": null
+      }
+    ],
+    "allow_response_actions": false,
+    "created_at": "2019-04-22T19:44:18Z",
+    "data_retention_months": 1,
+    "description": "Tenant description",
+    "domain": "",
+    "domain_normalized": "",
+    "enabled": false,
+    "enabled_in_pilot": false,
+    "enabled_in_production": false,
+    "enabled_on_delta": false,
+    "enabled_on_echo": false,
+    "enabled_on_foxtrot": false,
+    "enabled_on_prod": false,
+    "environments": [
+      {
+        "id": "5cd0fba7-b766-4f0c-96ac-81ff0496e487",
+        "created_at": "2019-04-22T19:44:18Z",
+        "updated_at": "2019-04-22T19:44:18Z",
+        "tenant_id": "0",
+        "name": "production",
+        "enabled": false
+      }
+    ],
+    "expires_at": null,
+    "granted_services": [
+      {
+        "id": "b42d014f-a7cb-4b8c-b6bc-ac5fb5cca24f",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-05-31T18:34:25Z",
+        "updated_at": "2024-05-31T18:34:25Z",
+        "requested_at": null,
+        "granted_at": "2024-05-31T18:34:25Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "is_organization": false,
+    "is_partner": false,
+    "labels": [
+      {
+        "id": "6",
+        "tenant_id": "10001",
+        "name": "ctp_client_id",
+        "value": "5537565",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "7",
+        "tenant_id": "10001",
+        "name": "red_cloak_id",
+        "value": "756e9418",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "207676",
+        "tenant_id": "10001",
+        "name": "zd_environment_sync_timestamp",
+        "value": "2021-09-23 20:21:55.838304702 +0000 UTC m=+6.408415078",
+        "owner_partner_tenant_id": "5000"
+      }
+    ],
+    "name": "Tenant 6",
+    "name_normalized": "tenant-6",
+    "organization": null,
+    "organization_name": null,
+    "parent": "5000",
+    "partner": "5000",
+    "partner_name": "All Tenants",
+    "partner_ship": null,
+    "post_disablement_complete": false,
+    "requested_services": [],
+    "services": null,
+    "support_enabled": false,
+    "updated_at": "2024-05-31T18:34:25Z"
+  },
+  {
+    "id": 5555,
+    "actions_approver": "jbavar+scwxanalyst@octolabs.io",
+    "age": 2049,
+    "all_services": [
+      {
+        "id": "535e9d73-2e47-467c-a90e-4defb25572f2",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-01-25T20:31:28Z",
+        "updated_at": "2023-01-25T20:31:28Z",
+        "requested_at": null,
+        "granted_at": "2023-01-25T20:31:28Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "c4d0be2c-ac8e-4d4a-8f9a-47cc82543f30",
+        "service_id": "0698e53c-4589-4f51-b916-d8ad31b97072",
+        "name": "Tenant",
+        "description": "Tenant description",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2024-04-26T21:27:50Z",
+        "updated_at": "2024-04-26T21:28:47Z",
+        "requested_at": null,
+        "granted_at": "2024-04-26T21:28:47Z",
+        "revoked_at": "2024-04-26T21:28:47Z",
+        "requested_by": null
+      }
+    ],
+    "allow_response_actions": false,
+    "created_at": "2019-07-19T15:21:06Z",
+    "data_retention_months": 1,
+    "description": "Test insert tenant",
+    "domain": "",
+    "domain_normalized": "",
+    "enabled": false,
+    "enabled_in_pilot": false,
+    "enabled_in_production": false,
+    "enabled_on_delta": false,
+    "enabled_on_echo": false,
+    "enabled_on_foxtrot": false,
+    "enabled_on_prod": false,
+    "environments": [
+      {
+        "id": "63cd472f-48b5-418b-b373-dd6cf8f423ae",
+        "created_at": "2021-08-24T17:44:34Z",
+        "updated_at": "2023-11-13T18:24:13Z",
+        "tenant_id": "0",
+        "name": "delta",
+        "enabled": false
+      },
+      {
+        "id": "ece83e80-bda5-4d0e-8e7b-f614aca5c529",
+        "created_at": "2021-08-24T17:43:51Z",
+        "updated_at": "2023-11-13T18:24:14Z",
+        "tenant_id": "0",
+        "name": "echo",
+        "enabled": false
+      },
+      {
+        "id": "57979628-6c15-4bbf-af5c-e624b5cde6e1",
+        "created_at": "2023-06-21T17:38:50Z",
+        "updated_at": "2025-02-14T22:04:41Z",
+        "tenant_id": "0",
+        "name": "foxtrot",
+        "enabled": false
+      },
+      {
+        "id": "fbde28fe-fe5b-47ce-bd88-906addaca96d",
+        "created_at": "2019-04-22T19:44:18Z",
+        "updated_at": "2023-11-13T18:24:17Z",
+        "tenant_id": "0",
+        "name": "production",
+        "enabled": false
+      }
+    ],
+    "expires_at": null,
+    "granted_services": [
+      {
+        "id": "535e9d73-2e47-467c-a90e-4defb25572f2",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-01-25T20:31:28Z",
+        "updated_at": "2023-01-25T20:31:28Z",
+        "requested_at": null,
+        "granted_at": "2023-01-25T20:31:28Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "is_organization": false,
+    "is_partner": false,
+    "labels": [
+      {
+        "id": "3",
+        "tenant_id": "5555",
+        "name": "red_cloak_id",
+        "value": "testInsertTenant1",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "33296",
+        "tenant_id": "5555",
+        "name": "foo",
+        "value": "bar",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "40985",
+        "tenant_id": "5555",
+        "name": "testing",
+        "value": "foobar",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "88457",
+        "tenant_id": "5555",
+        "name": "rc_version",
+        "value": "lts",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "224186",
+        "tenant_id": "5555",
+        "name": "ssdt",
+        "value": "trial",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "228036",
+        "tenant_id": "5555",
+        "name": "testing",
+        "value": "foobazz",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "374687",
+        "tenant_id": "5555",
+        "name": "test_tm_label",
+        "value": "test_tm_label",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "537363",
+        "tenant_id": "5555",
+        "name": "Test label",
+        "value": "Testing",
+        "owner_partner_tenant_id": "5000"
+      }
+    ],
+    "name": "Tenant 7",
+    "name_normalized": "tenant-7",
+    "organization": null,
+    "organization_name": null,
+    "parent": "5000",
+    "partner": "5000",
+    "partner_name": "All Tenants",
+    "partner_ship": null,
+    "post_disablement_complete": false,
+    "requested_services": [],
+    "services": null,
+    "support_enabled": false,
+    "updated_at": "2025-02-14T22:04:41Z"
+  },
+  {
+    "id": 5000,
+    "actions_approver": "mail456@sophos.com",
+    "age": 2063,
+    "all_services": [
+      {
+        "id": "bfb253c0-6b17-11eb-98c1-020fff5a091e",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2021-02-09T20:45:30Z",
+        "requested_at": null,
+        "granted_at": "2021-02-09T20:45:30Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "b67d464e-7b18-4be2-915a-a0593f859b1c",
+        "service_id": "d14ce9ee-17a7-4f6f-a680-e065b12f81cd",
+        "name": "MDR",
+        "description": "Managed Detection and Response Service",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-10-12T14:06:18Z",
+        "updated_at": "2021-10-12T14:06:18Z",
+        "requested_at": null,
+        "granted_at": "2021-10-12T14:06:18Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "allow_response_actions": false,
+    "created_at": "2019-07-05T15:00:22Z",
+    "data_retention_months": 12,
+    "description": "",
+    "domain": "",
+    "domain_normalized": "",
+    "enabled": false,
+    "enabled_in_pilot": false,
+    "enabled_in_production": true,
+    "enabled_on_delta": true,
+    "enabled_on_echo": true,
+    "enabled_on_foxtrot": true,
+    "enabled_on_prod": true,
+    "environments": [
+      {
+        "id": "5f68825d-6257-4e58-9f6f-f75395649309",
+        "created_at": "2021-06-29T16:47:36Z",
+        "updated_at": "2022-06-21T19:15:25Z",
+        "tenant_id": "0",
+        "name": "delta",
+        "enabled": true
+      },
+      {
+        "id": "c593f37c-30ad-4239-b34d-76124698c2f1",
+        "created_at": "2021-06-29T16:48:40Z",
+        "updated_at": "2022-06-21T19:15:25Z",
+        "tenant_id": "0",
+        "name": "echo",
+        "enabled": true
+      },
+      {
+        "id": "1702aef9-b5d8-4075-9029-edd1823475a6",
+        "created_at": "2023-06-08T14:41:22Z",
+        "updated_at": "2023-06-08T14:41:22Z",
+        "tenant_id": "0",
+        "name": "foxtrot",
+        "enabled": true
+      },
+      {
+        "id": "44c7cec7-1241-4aee-9e37-dda202e1ca0e",
+        "created_at": "2019-04-22T19:44:18Z",
+        "updated_at": "2022-06-21T19:15:25Z",
+        "tenant_id": "0",
+        "name": "production",
+        "enabled": true
+      }
+    ],
+    "expires_at": null,
+    "granted_services": [
+      {
+        "id": "bfb253c0-6b17-11eb-98c1-020fff5a091e",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2021-02-09T20:45:30Z",
+        "requested_at": null,
+        "granted_at": "2021-02-09T20:45:30Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "b67d464e-7b18-4be2-915a-a0593f859b1c",
+        "service_id": "d14ce9ee-17a7-4f6f-a680-e065b12f81cd",
+        "name": "MDR",
+        "description": "Managed Detection and Response Service",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-10-12T14:06:18Z",
+        "updated_at": "2021-10-12T14:06:18Z",
+        "requested_at": null,
+        "granted_at": "2021-10-12T14:06:18Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "is_organization": false,
+    "is_partner": true,
+    "labels": [
+      {
+        "id": "32027",
+        "tenant_id": "5000",
+        "name": "guardduty_external_id_5000",
+        "value": "ca2d5f84-a5f7-4032-ba5d-ebb6af0b4273",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "40984",
+        "tenant_id": "5000",
+        "name": "testing",
+        "value": "foobar",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "41983",
+        "tenant_id": "5000",
+        "name": "red_cloak_id",
+        "value": "fsdofijsodfij",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "121315",
+        "tenant_id": "5000",
+        "name": "tenants",
+        "value": "*",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "155108",
+        "tenant_id": "5000",
+        "name": "partner",
+        "value": "true",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "195529",
+        "tenant_id": "5000",
+        "name": "guardduty_account_id_5000_123456789101",
+        "value": "123456789101",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "195530",
+        "tenant_id": "5000",
+        "name": "guardduty_external_id_5000_123456789101",
+        "value": "e36af396-b4b4-4c3b-8282-1378ab727396",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "204461",
+        "tenant_id": "5000",
+        "name": "guardduty_account_id_5000_123456789012",
+        "value": "123456789012",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "204462",
+        "tenant_id": "5000",
+        "name": "guardduty_external_id_5000_123456789012",
+        "value": "cd836018-a08a-4a12-9b48-b069f8bcd590",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "207675",
+        "tenant_id": "5000",
+        "name": "zd_environment_sync_timestamp",
+        "value": "2021-09-23 20:21:55.345487757 +0000 UTC m=+5.915598154",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "230697",
+        "tenant_id": "5000",
+        "name": "red_cloak_id",
+        "value": "1234",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "256089",
+        "tenant_id": "5000",
+        "name": "foo",
+        "value": "bar",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "263199",
+        "tenant_id": "5000",
+        "name": "test_autoinc_1",
+        "value": "value1",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "263201",
+        "tenant_id": "5000",
+        "name": "test_autoinc_2",
+        "value": "value2",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "273603",
+        "tenant_id": "5000",
+        "name": "microsoft_graph_user_response_tenant",
+        "value": "95daa1c2-0aef-45f5-8dba-a3557defc6b8",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "294343",
+        "tenant_id": "5000",
+        "name": "test",
+        "value": "test",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "294345",
+        "tenant_id": "5000",
+        "name": "test2",
+        "value": "test",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "310233",
+        "tenant_id": "5000",
+        "name": "Test label",
+        "value": "Testing",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "393305",
+        "tenant_id": "5000",
+        "name": "scwx_internal",
+        "value": "true",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "804763",
+        "tenant_id": "5000",
+        "name": "guardduty_account_id_5000_111111111111",
+        "value": "111111111111",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "804765",
+        "tenant_id": "5000",
+        "name": "guardduty_external_id_5000_111111111111",
+        "value": "44bf7089-ed8f-4f27-a986-b8810a5f48ac",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "811015",
+        "tenant_id": "5000",
+        "name": "guardduty_account_id_5000_123712312312",
+        "value": "123712312312",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "811017",
+        "tenant_id": "5000",
+        "name": "guardduty_external_id_5000_123712312312",
+        "value": "9c12a347-4660-4398-b82a-03fb38fc5b93",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "895599",
+        "tenant_id": "5000",
+        "name": "disable_tenant_creation_envs",
+        "value": "charlie",
+        "owner_partner_tenant_id": "5000"
+      }
+    ],
+    "name": "Tenant 8",
+    "name_normalized": "tenant-8",
+    "organization": null,
+    "organization_name": null,
+    "parent": null,
+    "partner": null,
+    "partner_name": null,
+    "partner_ship": null,
+    "post_disablement_complete": false,
+    "requested_services": [],
+    "services": null,
+    "support_enabled": false,
+    "updated_at": "2025-02-10T13:35:28Z"
+  },
+  {
+    "id": 10000,
+    "actions_approver": "email678@sophos.com",
+    "age": 2136,
+    "all_services": [
+      {
+        "id": "b283b876-d5ec-4087-84b7-42723102ce6d",
+        "service_id": "f6886ca7-fcdf-4163-9e32-ce52680ab9a7",
+        "name": "Ask an Expert",
+        "description": "Ask an Expert Service for TDR",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2022-10-14T19:21:59Z",
+        "updated_at": "2023-09-13T11:31:12Z",
+        "requested_at": null,
+        "granted_at": "2023-09-13T11:31:12Z",
+        "revoked_at": "2023-09-13T11:31:12Z",
+        "requested_by": null
+      },
+      {
+        "id": "822d3710-db75-4e45-be60-be91f73684bb",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-10-25T14:35:27Z",
+        "updated_at": "2023-10-25T14:35:27Z",
+        "requested_at": null,
+        "granted_at": "2023-10-25T14:35:27Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "bfd906cb-6b17-11eb-98c1-020fff5a091e",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2023-10-25T14:35:27Z",
+        "requested_at": null,
+        "granted_at": "2023-10-25T14:35:27Z",
+        "revoked_at": "2023-10-25T14:35:27Z",
+        "requested_by": null
+      },
+      {
+        "id": "c9a4adf7-4b2d-49c9-ba62-a408c86bd1b0",
+        "service_id": "1fc0b64b-2534-4b6c-8fc7-7599a2300524",
+        "name": "DISABLED",
+        "description": "Customer no longer subscribes to services.",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-09-13T11:31:20Z",
+        "updated_at": "2023-09-13T11:31:20Z",
+        "requested_at": null,
+        "granted_at": "2023-09-13T11:31:20Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "3ed89957-fdfb-4216-88f8-10afca3a6630",
+        "service_id": "39c2ef9a-c84d-4bb8-b160-ea1f47f5b33c",
+        "name": "Standard Data Volume",
+        "description": "4 GB/Month * Contracted Endpoints",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-03-01T19:51:56Z",
+        "updated_at": "2023-03-01T19:51:56Z",
+        "requested_at": null,
+        "granted_at": "2023-03-01T19:51:56Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "allow_response_actions": false,
+    "created_at": "2019-04-22T19:44:18Z",
+    "data_retention_months": 1,
+    "description": "Tenant description",
+    "domain": "",
+    "domain_normalized": "",
+    "enabled": false,
+    "enabled_in_pilot": true,
+    "enabled_in_production": false,
+    "enabled_on_delta": false,
+    "enabled_on_echo": false,
+    "enabled_on_foxtrot": false,
+    "enabled_on_prod": false,
+    "environments": [
+      {
+        "id": "a4794b03-ccd5-458c-a965-743ff44b9c95",
+        "created_at": "2022-10-14T19:28:30Z",
+        "updated_at": "2023-09-13T11:31:20Z",
+        "tenant_id": "0",
+        "name": "delta",
+        "enabled": false
+      },
+      {
+        "id": "5f854878-7acf-4ed8-b6de-23ff1d6e25a3",
+        "created_at": "2024-04-19T13:32:44Z",
+        "updated_at": "2024-04-19T13:32:44Z",
+        "tenant_id": "0",
+        "name": "pilot",
+        "enabled": true
+      },
+      {
+        "id": "b29c2937-86c1-4ad1-b3bc-90cb90338632",
+        "created_at": "2019-04-22T19:44:18Z",
+        "updated_at": "2022-10-14T19:28:32Z",
+        "tenant_id": "0",
+        "name": "production",
+        "enabled": false
+      }
+    ],
+    "expires_at": null,
+    "granted_services": [
+      {
+        "id": "822d3710-db75-4e45-be60-be91f73684bb",
+        "service_id": "f3a547e2-c08f-4847-b672-34334e7bb348",
+        "name": "Data Retention: 1 mo",
+        "description": "Total Data Retention Period: 1 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-10-25T14:35:27Z",
+        "updated_at": "2023-10-25T14:35:27Z",
+        "requested_at": null,
+        "granted_at": "2023-10-25T14:35:27Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "c9a4adf7-4b2d-49c9-ba62-a408c86bd1b0",
+        "service_id": "1fc0b64b-2534-4b6c-8fc7-7599a2300524",
+        "name": "DISABLED",
+        "description": "Customer no longer subscribes to services.",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-09-13T11:31:20Z",
+        "updated_at": "2023-09-13T11:31:20Z",
+        "requested_at": null,
+        "granted_at": "2023-09-13T11:31:20Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "3ed89957-fdfb-4216-88f8-10afca3a6630",
+        "service_id": "39c2ef9a-c84d-4bb8-b160-ea1f47f5b33c",
+        "name": "Standard Data Volume",
+        "description": "4 GB/Month * Contracted Endpoints",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-03-01T19:51:56Z",
+        "updated_at": "2023-03-01T19:51:56Z",
+        "requested_at": null,
+        "granted_at": "2023-03-01T19:51:56Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "is_organization": false,
+    "is_partner": false,
+    "labels": [
+      {
+        "id": "4",
+        "tenant_id": "10000",
+        "name": "ctp_client_id",
+        "value": "5559197",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "5",
+        "tenant_id": "10000",
+        "name": "red_cloak_id",
+        "value": "e93dd9c6",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "387199",
+        "tenant_id": "10000",
+        "name": "account_number",
+        "value": "18681",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "510833",
+        "tenant_id": "10000",
+        "name": "industry",
+        "value": "Education",
+        "owner_partner_tenant_id": "5000"
+      }
+    ],
+    "name": "Tenant 9",
+    "name_normalized": "tenant-9",
+    "organization": null,
+    "organization_name": null,
+    "parent": "5000",
+    "partner": "5000",
+    "partner_name": "All Tenants",
+    "partner_ship": null,
+    "post_disablement_complete": false,
+    "requested_services": [],
+    "services": null,
+    "support_enabled": false,
+    "updated_at": "2024-04-19T13:32:44Z"
+  },
+  {
+    "id": 10004,
+    "actions_approver": "email987@sophos.com",
+    "age": 1909,
+    "all_services": [
+      {
+        "id": "0b663202-09e8-4fd7-994b-23fd9e17bd47",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2021-02-09T20:45:30Z",
+        "requested_at": null,
+        "granted_at": "2021-02-09T20:45:30Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "c1d922d1-6636-45c6-8536-ab2a2d06a00a",
+        "service_id": "1cf361b7-e229-4a6c-b434-6fa41339279d",
+        "name": "Licensed Data Volume",
+        "description": "Based on Licensing",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-01-24T18:10:58Z",
+        "updated_at": "2023-01-24T18:10:58Z",
+        "requested_at": null,
+        "granted_at": "2023-01-24T18:10:58Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "2b269261-aa40-4ecb-9698-d971147ff2a6",
+        "service_id": "d14ce9ee-17a7-4f6f-a680-e065b12f81cd",
+        "name": "MDR",
+        "description": "Managed Detection and Response Service",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2022-02-04T14:48:02Z",
+        "updated_at": "2022-02-04T14:48:02Z",
+        "requested_at": null,
+        "granted_at": "2022-02-04T14:48:02Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "5d713ebf-e935-43dc-955f-02b942076a56",
+        "service_id": "ebf23f41-8ca2-4cad-89df-ab8fea3dd4e9",
+        "name": "Unlimited Response",
+        "description": "Customers who have signed up for Unlimited Response",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-10-02T21:10:50Z",
+        "updated_at": "2023-10-02T21:10:50Z",
+        "requested_at": null,
+        "granted_at": "2023-10-02T21:10:50Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "allow_response_actions": false,
+    "created_at": "2019-12-06T04:51:45Z",
+    "data_retention_months": 12,
+    "description": "Tenant description",
+    "domain": "",
+    "domain_normalized": "",
+    "enabled": true,
+    "enabled_in_pilot": false,
+    "enabled_in_production": true,
+    "enabled_on_delta": false,
+    "enabled_on_echo": false,
+    "enabled_on_foxtrot": false,
+    "enabled_on_prod": true,
+    "environments": [
+      {
+        "id": "0c25ec43-0c77-46ed-afad-240042b52793",
+        "created_at": "2019-04-22T19:44:19Z",
+        "updated_at": "2021-12-17T11:06:55Z",
+        "tenant_id": "0",
+        "name": "production",
+        "enabled": true
+      }
+    ],
+    "expires_at": null,
+    "granted_services": [
+      {
+        "id": "0b663202-09e8-4fd7-994b-23fd9e17bd47",
+        "service_id": "f4ec38ee-8e9c-4d95-a81c-60cdbe139266",
+        "name": "Data Retention: 12 mo",
+        "description": "Total Data Retention Period: 12 Months",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2021-02-09T20:45:30Z",
+        "updated_at": "2021-02-09T20:45:30Z",
+        "requested_at": null,
+        "granted_at": "2021-02-09T20:45:30Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "c1d922d1-6636-45c6-8536-ab2a2d06a00a",
+        "service_id": "1cf361b7-e229-4a6c-b434-6fa41339279d",
+        "name": "Licensed Data Volume",
+        "description": "Based on Licensing",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-01-24T18:10:58Z",
+        "updated_at": "2023-01-24T18:10:58Z",
+        "requested_at": null,
+        "granted_at": "2023-01-24T18:10:58Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "2b269261-aa40-4ecb-9698-d971147ff2a6",
+        "service_id": "d14ce9ee-17a7-4f6f-a680-e065b12f81cd",
+        "name": "MDR",
+        "description": "Managed Detection and Response Service",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2022-02-04T14:48:02Z",
+        "updated_at": "2022-02-04T14:48:02Z",
+        "requested_at": null,
+        "granted_at": "2022-02-04T14:48:02Z",
+        "revoked_at": null,
+        "requested_by": null
+      },
+      {
+        "id": "5d713ebf-e935-43dc-955f-02b942076a56",
+        "service_id": "ebf23f41-8ca2-4cad-89df-ab8fea3dd4e9",
+        "name": "Unlimited Response",
+        "description": "Customers who have signed up for Unlimited Response",
+        "service_owner_id": "5000",
+        "owned_by_partner": false,
+        "created_at": "2023-10-02T21:10:50Z",
+        "updated_at": "2023-10-02T21:10:50Z",
+        "requested_at": null,
+        "granted_at": "2023-10-02T21:10:50Z",
+        "revoked_at": null,
+        "requested_by": null
+      }
+    ],
+    "is_organization": false,
+    "is_partner": false,
+    "labels": [
+      {
+        "id": "12",
+        "tenant_id": "10004",
+        "name": "ctp_client_id",
+        "value": "5658073",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "13",
+        "tenant_id": "10004",
+        "name": "red_cloak_id",
+        "value": "7e637007",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "235525",
+        "tenant_id": "10004",
+        "name": "account_number",
+        "value": "201415",
+        "owner_partner_tenant_id": "5000"
+      },
+      {
+        "id": "511183",
+        "tenant_id": "10004",
+        "name": "industry",
+        "value": "State Government",
+        "owner_partner_tenant_id": "5000"
+      }
+    ],
+    "name": "Tenant 10",
+    "name_normalized": "tenant-10",
+    "organization": null,
+    "organization_name": null,
+    "parent": "5000",
+    "partner": "5000",
+    "partner_name": "All Tenants",
+    "partner_ship": null,
+    "post_disablement_complete": false,
+    "requested_services": [],
+    "services": null,
+    "support_enabled": false,
+    "updated_at": "2023-10-09T19:06:39Z"
+  }
+]

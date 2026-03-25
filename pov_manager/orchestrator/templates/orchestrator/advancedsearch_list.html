@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+    <div class="container mt-5">
+        <h1 class="mb-4">Saved search list</h1>
+
+        <div class="row justify-content-end">
+            <div class="col-2">
+                <a href="{% url 'advancedsearch_create' %}" class="btn btn-primary float-end">Add search query</a>
+            </div>
+            <div class="col-2">
+                <a href="{% url 'category_list' %}" class="btn btn-primary float-end">Manage categories</a>
+            </div>
+        </div>
+
+        <div class="row mt-5">
+            {% for search in object_list %}
+                <div class="col-mb-4 mb-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">{{ search.name }}</h6>
+                            <h5 class="card-title">{{ search.query }}</h5>
+                            <a href="{% url 'advancedsearch_edit' search.pk %}" class="btn btn-primay btn-sm mr-2">Edit</a>
+                            <a href="{% url 'advancedsearch_delete' search.pk %}" class="btn btn-danger btn-sm">Delete</a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+    </div>
+{% endblock %}

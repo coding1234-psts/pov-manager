@@ -1,0 +1,39 @@
+{% load static %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{% url 'index' %}">Secureworks - PoV Manager</a>
+        <div class="collapse navbar-collapse" id="navbarNavDropdown">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link {% if location == 'xdr-dashboard' %} active {% endif %}" aria-current="page" href="url 'xdr-dashboard' ">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if location == 'xdr-list' %} active {% endif %}" href=" url 'xdr-list' ">XDR</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if location == 'jitlab' %} active {% endif %}" href=" url 'xdr-list' ?ttype=jitlab">JiTLab</a>
+                </li>
+                 <li class="nav-item">
+                    <a class="nav-link {% if location == 'pov' %} active {% endif %}" href=" url 'xdr-list' ?ttype=pov">XDR PoV</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if location == 'mxdrpov' %} active {% endif %}" href=" url 'xdr-list' ?ttype=mxdrpov">MXDR PoV</a>
+                </li>
+                 <li class="nav-item">
+                    <a class="nav-link {% if location == 'mxdrelitepov' %} active {% endif %}" href=" url 'xdr-list' ?ttype=mxdrelitepov">MXDR Elite PoV</a>
+                </li>
+                 <li class="nav-item">
+                    <a class="nav-link {% if location == 'ssdt' %} active {% endif %}" href=" url 'xdr-list' ?ttype=ssdt">SSDT</a>
+                </li>
+            </ul>
+        </div>
+        <ul class="nav navbar-nav navbar-right">
+            <li class="mx-1">
+                <a href="{% url 'orchestrator-dashboard' %}" class="btn btn-success"><i class="bi bi-magic"></i> Orchestrator</a>
+            </li>
+            <li class="mx-1">
+                <a href="{% url 'logout' %}" class="btn btn-danger" onclick="return confirm('Are you sure you want to logout?')">Log out</a>
+            </li>
+        </ul>
+    </div>
+</nav>

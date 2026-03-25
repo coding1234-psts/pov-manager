@@ -1,0 +1,294 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+    {% include 'nav.html' with app="xdr" %}
+    <div class="container">
+        <div id="confirmed_gc_tenants" {% if not valid_gb_tenants %}style="display:none;"{% else %}style="display:block;"{% endif %}>
+            <h3 class="text-danger my-5" id="page_header">Are you sure you want to run the garbage collector for the following tenants?</h3>
+            <form onsubmit="event.preventDefault(); run_gc();">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th class="align-top">ID</th>
+                                <th class="align-top">Name</th>
+                                <th class="align-top">Age</th>
+                                <th class="align-top">Remaining Days</th>
+                                <th class="align-top">Services</th>
+                                <th class="align-top">Labels</th>
+                                <th class="text-center align-top">Environments</th>
+                                <th class="align-top"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="confirmed_tenants_table_body">
+                            {% if valid_gb_tenants %}
+                                {% for tenant in valid_gb_tenants %}
+                                    <tr id="tenant_row_{{ tenant.id }}">
+                                        <td>{{ tenant.id }}</td>
+                                        <td>{{ tenant.name }}</td>
+                                        <td>{{ tenant.age }}{% if tenant.age == 1 %} day {% else %} days {% endif %}</td>
+                                        <td>{{ tenant.remaining_days|default_if_none:'' }}</td>
+                                        <td>
+                                            {% if tenant.services %}
+                                                <ul>
+                                                    {% for service in tenant.services %}
+                                                        <li>{{ service.name }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if tenant.labels %}
+                                                <ul>
+                                                    {% for label in tenant.labels %}
+                                                        <li>{{ label.name }}: <b>{{ label.value }}</b></li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <ul>
+                                                <li>Production:
+                                                    {% if tenant.prod_env %}
+                                                        <span class="badge text-bg-success mx-1">Enabled</span>
+                                                    {% else %}
+                                                        <span class="badge text-bg-danger mx-1">Disabled</span>
+                                                    {% endif %}
+                                                </li>
+                                                <li>Delta:
+                                                    {% if tenant.delta_env %}
+                                                        <span class="badge text-bg-success mx-1">Enabled</span>
+                                                    {% else %}
+                                                        <span class="badge text-bg-danger mx-1">Disabled</span>
+                                                    {% endif %}
+                                                </li>
+                                                <li>Echo:
+                                                    {% if tenant.echo_env %}
+                                                        <span class="badge text-bg-success mx-1">Enabled</span>
+                                                    {% else %}
+                                                        <span class="badge text-bg-danger mx-1">Disabled</span>
+                                                    {% endif %}
+                                                </li>
+                                            </ul>
+                                        </td>
+                                        <td>
+                                            <input type="hidden" name="accepted_tenant" value="{{ tenant.id }}">
+                                            <button type="button" class="btn btn-outline-danger" onclick="remove_tenant({{ tenant.id }})"><i class="bi bi-trash3"></i></button>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-end my-5" id="confirm_list_action_buttons">
+                    <input type="submit" value="Yes, I am sure" class="btn btn-danger btn-lg">
+                    <a class="btn btn-primary btn-lg" href="{% url 'xdr-list' %}">No, cancel</a>
+                </div>
+            </form>
+        </div>
+        {% if invalid_gb_tenants %}
+            <h4 class="my-5">The following tenants cannot be garbage collected</h4>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th class="align-top">ID</th>
+                            <th class="align-top">Name</th>
+                            <th class="align-top">Age</th>
+                            <th class="align-top">Remaining Days</th>
+                            <th class="align-top">Services</th>
+                            <th class="align-top">Labels</th>
+                            <th class="text-center align-top">Environments</th>
+                            <th class="text-center align-top">Reasons</th>
+                            <th class="text-center align-top">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tenant in invalid_gb_tenants %}
+                            <tr id="invalid_tenant_row_{{ tenant.id }}">
+                                <td id="invalid_tenant_id_{{ tenant.id }}">{{ tenant.id }}</td>
+                                <td id="invalid_tenant_name_{{ tenant.id }}">{{ tenant.name }}</td>
+                                <td id="invalid_tenant_age_{{ tenant.id }}">{{ tenant.age }}{% if tenant.age == 1 %} day {% else %} days {% endif %}</td>
+                                <td id="invalid_tenant_remaining_days_{{ tenant.id }}">{{ tenant.remaining_days|default_if_none:'' }}</td>
+                                <td id="invalid_tenant_services_{{ tenant.id }}">
+                                    {% if tenant.services %}
+                                        <ul>
+                                            {% for service in tenant.services %}
+                                                <li>{{ service.name }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endif %}
+                                </td>
+                                <td id="invalid_tenant_labels_{{ tenant.id }}">
+                                    {% if tenant.labels %}
+                                        <ul>
+                                            {% for label in tenant.labels %}
+                                                <li>{{ label.name }}: <b>{{ label.value }}</b></li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endif %}
+                                </td>
+                                <td id="invalid_tenant_environments_{{ tenant.id }}">
+                                    <ul>
+                                        <li>Production:
+                                            {% if tenant.prod_env %}
+                                                <span class="badge text-bg-success mx-1">Enabled</span>
+                                            {% else %}
+                                                <span class="badge text-bg-danger mx-1">Disabled</span>
+                                            {% endif %}
+                                        </li>
+                                        <li>Delta:
+                                            {% if tenant.delta_env %}
+                                                <span class="badge text-bg-success mx-1">Enabled</span>
+                                            {% else %}
+                                                <span class="badge text-bg-danger mx-1">Disabled</span>
+                                            {% endif %}
+                                        </li>
+                                        <li>Echo:
+                                            {% if tenant.echo_env %}
+                                                <span class="badge text-bg-success mx-1">Enabled</span>
+                                            {% else %}
+                                                <span class="badge text-bg-danger mx-1">Disabled</span>
+                                            {% endif %}
+                                        </li>
+                                    </ul>
+                                </td>
+                                <td>
+                                    <ul>
+                                        {% for error in tenant.gb_errors %}
+                                            <li>{{ error }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                                <td><button type="button" class="btn btn-danger" onclick="force_gc()" data-tenant-id="{{ tenant.id }}"><i class="bi bi-trash3">Force</i></button></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block footer %}
+    <script>
+        function remove_tenant(tenant_id) {
+            document.getElementById('tenant_row_' + tenant_id).remove();
+        }
+
+        function run_gc() {
+            let csrftoken = '{{ csrf_token }}';
+            let confirmedTenantIds = document.getElementsByName("accepted_tenant");
+            let confirmListActionButtons = document.getElementById("confirm_list_action_buttons");
+            let fetches = [];
+
+            confirmListActionButtons.style.display="none";
+
+            for (let i = 0; i < confirmedTenantIds.length; i++) {
+                let tenantId = confirmedTenantIds[i].value;
+                let tenantRow = document.getElementById('tenant_row_' + tenantId);
+                let removeBtn = tenantRow.getElementsByTagName('button')[0];
+                let removeBtnLabel = tenantRow.getElementsByTagName('i')[0];
+
+                removeBtn.disabled = true;
+                removeBtn.removeAttribute("onclick");
+
+                removeBtnLabel.classList.remove('bi-trash3');
+                removeBtnLabel.classList.add('bi-arrow-clockwise');
+                removeBtnLabel.textContent = ' Processing';
+
+                fetches.push(
+                    fetch('/api/v1/xdr/tenant/gc/', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrftoken
+                        },
+                        body: JSON.stringify({ tenant_id: tenantId })
+                    })
+                    .then(res => {
+                        if (!res.ok) {
+                            return res.text().then(text => { throw new Error(text) });
+                        } else {
+                            return res.json();
+                        }
+                     })
+                    .then(res => {
+                        removeBtn.classList.remove('btn-outline-danger');
+                        removeBtn.classList.add('btn-outline-success');
+
+                        removeBtnLabel.classList.remove('bi-arrow-clockwise');
+                        removeBtnLabel.classList.add('bi-check-circle');
+                        removeBtnLabel.textContent = ' Done';
+                    })
+                    .catch(err => {
+                        removeBtnLabel.classList.remove('bi-arrow-clockwise');
+                        removeBtnLabel.classList.add('bi-exclamation-triangle-fill');
+                        removeBtnLabel.textContent = ' Error';
+                    })
+                );
+            }
+
+            Promise.all(fetches).then(() => {
+                let pageHeader = document.getElementById('page_header');
+                pageHeader.textContent = 'Tenant GC process is completed!';
+                pageHeader.classList.remove('text-danger');
+                pageHeader.classList.add('text-success');
+            });
+
+        }
+
+        function force_gc() {
+            let callerBtn = event.currentTarget;
+
+            let invalidTenantId = callerBtn.dataset.tenantId;
+            let invalidTenantNameCell = document.getElementById("invalid_tenant_name_" + invalidTenantId);
+            let invalidTenantAgeCell = document.getElementById("invalid_tenant_age_" + invalidTenantId);
+            let invalidTenantRemainingDaysCell = document.getElementById("invalid_tenant_remaining_days_" + invalidTenantId);
+            let invalidTenantServicesCell = document.getElementById("invalid_tenant_services_" + invalidTenantId);
+            let invalidTenantLabelsCell = document.getElementById("invalid_tenant_labels_" + invalidTenantId);
+            let invalidTenantEnvironmentsCell = document.getElementById("invalid_tenant_environments_" + invalidTenantId);
+
+            let table = document.getElementById("confirmed_tenants_table_body");
+            let newRow = table.insertRow(-1);
+            newRow.setAttribute("id", "tenant_row_" + invalidTenantId);
+
+            let newCellId = newRow.insertCell(0);
+            let newCellName = newRow.insertCell(1);
+            let newCellAge = newRow.insertCell(2);
+            let newCellRemainingDays = newRow.insertCell(3);
+            let newCellServices = newRow.insertCell(4);
+            let newCellLabels = newRow.insertCell(5);
+            let newCellEnvironments = newRow.insertCell(6);
+            let newCellActions = newRow.insertCell(7);
+
+            newCellId.appendChild(document.createTextNode(invalidTenantId));
+            newCellName.appendChild(invalidTenantNameCell.cloneNode(true));
+            newCellAge.appendChild(invalidTenantAgeCell.cloneNode(true));
+            newCellRemainingDays.appendChild(invalidTenantRemainingDaysCell.cloneNode(true));
+            newCellServices.appendChild(invalidTenantServicesCell.cloneNode(true));
+            newCellLabels.appendChild(invalidTenantLabelsCell.cloneNode(true));
+            newCellEnvironments.appendChild(invalidTenantEnvironmentsCell.cloneNode(true));
+
+            let input = document.createElement("input");
+            input.setAttribute("type", "hidden");
+            input.setAttribute("name", "accepted_tenant");
+            input.setAttribute("value", invalidTenantId);
+
+            let removeTenantButton = document.createElement('button');
+            removeTenantButton.setAttribute("type", "button");
+            removeTenantButton.setAttribute("class", "btn btn-outline-danger");
+            removeTenantButton.setAttribute("onclick", "remove_tenant('" + invalidTenantId + "')");
+            removeTenantButton.innerHTML = '<i class="bi bi-trash3"></i>';
+
+            newCellActions.appendChild(input);
+            newCellActions.appendChild(removeTenantButton);
+
+            document.getElementById('invalid_tenant_row_' + invalidTenantId).remove();
+            document.getElementById('confirmed_gc_tenants').style.display="block";
+        }
+    </script>
+{% endblock %}

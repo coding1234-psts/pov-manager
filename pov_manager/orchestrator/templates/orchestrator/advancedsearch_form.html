@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load static %}
+<!--{% load bootstrap5 %}-->
+{% block content %}
+    <div class="container mt-5">
+        <h1>{% if form.instance.pk %}Edit{% else %}Create{% endif %} saved search</h1>
+        <form method="post" action="{% if form.instance.pk %}{% url 'advancedsearch_edit' pk=form.instance.pk %}{% else %}{% url 'advancedsearch_create' %}{% endif %}">
+            {% csrf_token %}
+            {% bootstrap_form form %}
+            <button type="submit">{% if form.instance.pk %}Update{% else %}Create{% endif %}</button>
+        </form>
+        <a href="{% url 'advancedsearch_list' %}" class="btn btn-primay">Back to list</a>
+
+        <!-- Button trigger modal for Add Category -->
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+            Add Category
+        </button>
+
+        <!-- Add Category Modal -->
+        <div class="modal fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addCategoryModalLabel">Add New Category</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Add Category Form -->
+                        <form id="addCategoryForm" method="post" action="{% url 'category_create' %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Category Name</label>
+                                <input type="text" class="form-control" id="name" name="name" required>
+                            </div>
+                            <!-- Other fields if needed -->
+                            <button type="submit" class="btn btn-primary">Add Category</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

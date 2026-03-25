@@ -1,0 +1,1129 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+    <div class="container-fluid mt-4">
+        <h1>Threat Profile Manager</h1>
+        <div class="row">
+            <div class="col-md-6 mt-3">
+                <button class="badge rounded-pill bg-primary float-start" style="font-size: 15px;border: none;" id="filter_created_by_btn" onclick="applyFilter('created_by')">Created By: {{ request.user.full_name }}</button>
+                <button class="badge rounded-pill bg-primary mx-2 float-start" style="font-size: 15px;border: none;" id="filter_se_email_btn" onclick="applyFilter('se_email')">SE Email: {{ request.user.email }}</button>
+            </div>
+            <div class="col-md-6 mt-3">
+                {% if allow_to_export_csv %}
+                    <a href="{% url 'export_threat_profiles_csv' %}" class="btn btn-success float-end mx-1">Export</a>
+                {% endif %}
+
+                <button class="btn btn-primary float-end" id="add_form_btn" data-bs-toggle="modal" data-bs-target="#profileModal">Add profile</button>
+            </div>
+        </div>
+        {% if profiles %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Organization name</th>
+                            <th>Organization Email Domains</th>
+                            <th>Organization domain</th>
+                            <th>
+                                <div class="d-flex align-items-center">
+                                    <span>SE Email</span>
+                                    <!-- SE Email Filter Dropdown -->
+                                    <div class="dropdown ms-2">
+                                        <button class="btn btn-link btn-sm p-0 {% if selected_se_emails %}text-primary{% else %}text-secondary{% endif %}" 
+                                                type="button" 
+                                                id="seEmailFilterDropdown" 
+                                                data-bs-toggle="dropdown" 
+                                                data-bs-auto-close="outside" 
+                                                aria-expanded="false"
+                                                title="Filter by SE Email">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                                <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5v-2z"/>
+                                            </svg>
+                                            {% if selected_se_emails %}
+                                                <span class="badge bg-primary rounded-pill" style="font-size: 10px; vertical-align: top;">{{ selected_se_emails|length }}</span>
+                                            {% endif %}
+                                        </button>
+                                        <div class="dropdown-menu p-3 shadow" style="min-width: 300px; max-height: 400px;" aria-labelledby="seEmailFilterDropdown">
+                                            <!-- Search Input -->
+                                            <div class="mb-2">
+                                                <input type="text" class="form-control form-control-sm" id="seEmailSearchInput" placeholder="Search SE emails..." autocomplete="off">
+                                            </div>
+                                            
+                                            <!-- Select All / Clear All -->
+                                            <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" id="selectAllSeEmails">Select All</button>
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-danger" id="clearAllSeEmails">Clear All</button>
+                                            </div>
+                                            
+                                            <!-- SE Email Checkboxes -->
+                                            <div class="se-email-checkbox-list" style="max-height: 220px; overflow-y: auto;">
+                                                {% for se_email in all_se_emails %}
+                                                    <div class="form-check se-email-item">
+                                                        <input class="form-check-input se-email-checkbox" type="checkbox" value="{{ se_email }}" id="seEmail_{{ forloop.counter }}"{% if se_email in selected_se_emails %} checked{% endif %}>
+                                                        <label class="form-check-label se-email-label small" for="seEmail_{{ forloop.counter }}">{{ se_email }}</label>
+                                                    </div>
+                                                {% empty %}
+                                                    <p class="text-muted small mb-0">No SE emails available</p>
+                                                {% endfor %}
+                                            </div>
+                                            
+                                            <!-- Apply Button -->
+                                            <div class="mt-3 pt-2 border-top d-flex gap-2">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" id="clearSeEmailFilter">Clear</button>
+                                                <button type="button" class="btn btn-primary btn-sm flex-grow-1" id="applySeEmailFilter">Apply</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                            <th>IP Ranges</th>
+                            <th>Organization emails</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Status date</th>
+                            <th class="text-center" style="width:18%">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for profile in profiles %}
+                            <tr>
+                                <td class="align-middle">{{ profile.pk }}</td>
+                                <td class="align-middle" data-column="organization_name"><b>{{ profile.organization_name }}</b></td>
+                                <td class="align-middle" data-column="organization_email_domains">
+                                    {% if profile.organization_email_domains %}
+                                        {% for domain in profile.organization_email_domains %}
+                                            {{ domain }}<br>
+                                        {% endfor %}
+                                    {% endif %}
+                                </td>
+                                <td class="align-middle" data-column="organization_domain">{{ profile.organization_domain }}</td>
+                                <td class="align-middle" data-column="se_email">{{ profile.se_email }}</td>
+                                <td class="align-middle" data-column="ip_ranges">
+                                    {% if profile.ip_ranges %}
+                                        {% for ip_range in profile.ip_ranges %}
+                                            {{ ip_range }}<br>
+                                        {% endfor %}
+                                    {% endif %}
+                                </td>
+                                <td class="align-middle" data-column="organization_email_addresses">
+                                    {% if profile.organization_emails %}
+                                        {% for email in profile.organization_emails %}
+                                            {{ email }}<br>
+                                        {% endfor %}
+                                    {% endif %}
+                                </td>
+                                <td class="align-middle text-center">{{ profile.get_status_display }}</td>
+                                <td>{{ profile.modified_data|date:"M d, Y" }}</td>
+                                <td class="align-middle text-center">
+                                    {% if profile.status == 'CREATED' %}
+                                        <button type="button" class="btn btn-warning btn-sm mx-1 my-1" onclick="fillEditForm(this, '{% url 'update_threat_profile' threat_profile_unique_id=profile.unique_id %}', '{{ profile.unique_id }}')">Edit</button><br/>
+
+                                        {% if profile.ip_ranges %}
+                                            <a href="{% url 'start_vdr_scans' threat_profile_unique_id=profile.unique_id %}" class="btn btn-success btn-sm mx-1 my-1" onclick="return confirm('Are you sure you want to start scanning?')">Start scans</a><br/>
+                                        {% endif %}
+
+                                        {% if not profile.ip_ranges %}
+                                            <a href="{% url 'force_generate_ctu_autobrief_report' threat_profile_unique_id=profile.unique_id %}" class="btn btn-primary btn-sm mx-1 my-1" onclick="return confirm('Are you sure you want to generate the threat profile without VDR scan results?')" title="Start generate organization's Threat Profile without VDR scan results">Generate Threat Profile</a><br/>
+                                        {% endif %}
+
+                                        <form action="{% url 'delete_threat_profile' threat_profile_unique_id=profile.unique_id %}" method="post" class="mx-1 my-1">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="threat_profile_uid" value="{{ profile.unique_id }}">
+                                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this profile?')">Delete</button>
+                                        </form>
+
+                                    {% elif profile.status == 'CTU_AUTOBRIEF_REPORT_REQUESTED' or profile.status == 'CTU_AUTOBRIEF_REPORT_REQUESTED_WITHOUT_VDR' %}
+                                        <span class="text-muted small d-block mb-1">CTU Autobrief report pending (poll CTU for completion).</span>
+                                        {% if profile.status == 'CTU_AUTOBRIEF_REPORT_REQUESTED_WITHOUT_VDR' %}
+                                            <a href="{% url 'force_generate_ctu_autobrief_report' threat_profile_unique_id=profile.unique_id %}" class="btn btn-outline-primary btn-sm mx-1 my-1" onclick="return confirm('Submit a new CTU Autobrief job? This replaces the current report request ID.')" title="Call CTU again if the previous request failed or stalled">Resubmit to CTU</a><br/>
+                                        {% endif %}
+
+                                    {% elif profile.status == 'CTU_AUTOBRIEF_REPORT_AVAILABLE' %}
+
+                                        <a href="{% url 'ctu_autobrief_zip_file' ctu_autobrief_report_id=profile.ctu_autobrief_report_id %}" class="btn btn-primary btn-sm mx-1 my-1">Download Threat Profile</a>
+                                        <a href="{% url 'cleanup_vdr_profile' threat_profile_unique_id=profile.unique_id %}" class="btn btn-warning btn-sm mx-1 my-1" onclick="return confirm('Are you sure you want to restart this profile? The current data will be removed and you will be able to edit the inputs before restarting.')">Restart Report</a>
+
+                                    {% elif profile.status == 'CTU_AUTOBRIEF_REPORT_AVAILABLE_WITHOUT_VDR' %}
+
+                                        <a href="{% url 'ctu_autobrief_zip_file' ctu_autobrief_report_id=profile.ctu_autobrief_report_id %}" class="btn btn-primary btn-sm mx-1 my-1">Download Threat Profile</a>
+                                        <a href="{% url 'cleanup_vdr_profile' threat_profile_unique_id=profile.unique_id %}" class="btn btn-warning btn-sm mx-1 my-1" onclick="return confirm('Are you sure you want to restart this profile? The current data will be removed and you will be able to edit the inputs before restarting.')">Restart Report</a>
+
+                                    {% endif %}
+                                </td>
+                                <input type="hidden" data-column="vivun_activity" value="{{ profile.vivun_activity }}" />
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Section -->
+            <nav aria-label="Threat Profile Pagination" class="mt-4 mb-5">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="text-muted">
+                        Showing {{ profiles|length }} of {{ total_profiles }} threat profiles
+                    </div>
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?created_by={{ created_by_filter }}&se_email={{ se_email_filter }}&se_emails={{ se_emails_filter }}&page={{ current_page|add:-1 }}&page_size={{ page_size }}">Previous</a>
+                            </li>
+                        {% endif %}
+
+                        <li class="page-item active">
+                            <a class="page-link">Page {{ current_page }} of {{ total_pages }}</a>
+                        </li>
+
+                        {% if has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?created_by={{ created_by_filter }}&se_email={{ se_email_filter }}&se_emails={{ se_emails_filter }}&page={{ current_page|add:1 }}&page_size={{ page_size }}">Next</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                    <div>
+                        <form method="get" class="d-inline-flex align-items-center" id="page_size_form">
+                            <input type="hidden" name="created_by" value="{{ created_by_filter }}">
+                            <input type="hidden" name="se_email" value="{{ se_email_filter }}">
+                            <input type="hidden" name="se_emails" value="{{ se_emails_filter }}">
+                            <label for="page_size" class="me-2 mb-0">Items per page:</label>
+                            <select name="page_size" id="page_size" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                                <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
+                                <option value="20" {% if page_size == 20 %}selected{% endif %}>20</option>
+                                <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                                <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+                            </select>
+                        </form>
+                    </div>
+                </div>
+            </nav>
+        {% else %}
+            <p>There are no saved thread profiles or results for the current active filters.</p>
+        {% endif %}
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal fade" id="profileModal" tabindex="-1" aria-labelledby="profileModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" style="min-width:80%;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="profileModalLabel">Add Threat Profile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{% url 'threat_profile' %}" method="post" id="new_profile_form">
+                    {% csrf_token %}
+                    <input type="hidden" id="threat_profile_unique_id">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <h3 class="my-3">General Info</h3>
+                                <div class="form-group mt-4">
+                                    <label for="organization_name">Organization name*</label>
+                                    <input type="text" class="form-control" name="organization_name" id="organization_name" placeholder="Enter the organization's name">
+                                    <div id="organization_name_error" class="invalid-feedback" style="display: none;">Please enter an organization name.</div>
+                                </div>
+                                <div class="form-group mt-4">
+                                    <label for="se_email">SE Email</label>
+                                    <input type="email" class="form-control" id="se_email" name="se_email" placeholder="Enter the SE's email address">
+                                </div>
+                                <div class="form-group mt-4">
+                                    <label for="organization_domain">Organization domain</label>
+                                    <input type="text" class="form-control" name="organization_domain" id="organization_domain" placeholder="customer.com">
+                                </div>
+                                <div class="form-group mt-4">
+                                    <label for="vivun_activity">Vivun Activity*</label>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">HA-</span>
+                                        <input type="text" class="form-control" name="vivun_activity" id="vivun_activity" placeholder="Enter the Vivun Activity ID">
+                                    </div>
+                                    <div id="vivun_activity_error" class="invalid-feedback" style="display: none;">Please enter a valid and unique Vivun Activity ID (6 digits).</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <h3 class="my-3">Mail Addresses</h3>
+                                <div class="form-group mt-4">
+                                    <label for="organization_email_address">Organization Email Address*<strong id="organization-email-address-error" class="form-text text-danger"></strong></label>
+                                    <div class="input-group mb-3">
+                                        <input type="text" class="form-control" id="organization_email_address" placeholder="Enter email address">
+                                        <div class="input-group-append">
+                                            <button class="btn btn-primary" type="button" id="addOrgEmailAddress">Add</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-4">
+                                    <label for="organization_email_addresses">Organization Email Addresses*</label>
+                                    <select multiple class="form-control" name="organization_email_addresses" id="organization_email_addresses"></select>
+                                    <div id="organization_email_addresses_error" class="invalid-feedback" style="display: none;"></div>
+                                </div>
+                                <button class="btn btn-danger mt-4" type="button" id="removeOrgEmailAddress">Remove email</button>
+                            </div>
+                            <div class="col-md-3">
+                                <h3 class="my-3">Mail Domains</h3>
+                                <div class="form-group mt-4">
+                                    <label for="organization_email_domain">Organization Email Domain*<strong id="organization-email-domain-error" class="form-text text-danger"></strong></label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="organization_email_domain" placeholder="Enter email domain">
+                                        <div class="input-group-append">
+                                            <button class="btn btn-primary" type="button" id="addOrgEmailDomain">Add</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-4">
+                                    <label for="organization_email_domains">Organization Email Domains*</label>
+                                    <select multiple class="form-control" name="organization_email_domains" id="organization_email_domains"></select>
+                                    <div id="organization_email_domains_error" class="invalid-feedback" style="display: none;">.</div>
+                                </div>
+                                <button class="btn btn-danger mt-4" type="button" id="removeOrgEmailDomain">Remove domain</button>
+                                <p class="mt-3">Max of 3 domains can be added.</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h3 class="my-3">Public Ranges</h3>
+                                <div class="form-group mt-4">
+                                    <label for="ip_range">IP Range <strong id="range-error" class="form-text text-danger"></strong></label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="ip_range" placeholder="Enter a range">
+                                        <div class="input-group-append">
+                                            <button class="btn btn-primary" type="button" id="addRangeBtn">Add</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-4">
+                                    <label for="ip_ranges">Ranges</label>
+                                    <select multiple class="form-control" name="ip_ranges" id="ip_ranges"></select>
+                                </div>
+                                <button class="btn btn-danger mt-4" type="button" id="removeRangeBtn">Remove range</button>
+                                <p class="mt-3">Organization Perimeter Public Ranges [Optional] <br/>
+                                <p>Max 4 IP ranges with /24 are allowed.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Close</button>
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- End of Add/Edit Modal -->
+{% endblock %}
+
+{% block footer %}
+    <script>
+        let addProfileUrl = "{% url 'threat_profile' %}";
+        let new_profile_form = document.getElementById('new_profile_form');
+
+        // Helper function to extract domain from email address
+        function extractDomainFromEmail(email) {
+            const atIndex = email.lastIndexOf('@');
+            return atIndex !== -1 ? email.substring(atIndex + 1) : '';
+        }
+
+        // Helper function to check if domain already exists in the domains list
+        function isDomainAlreadyInList(domain) {
+            const organizationEmailDomains = document.getElementById('organization_email_domains');
+            const existingDomains = Array.from(organizationEmailDomains.options).map(option => option.value);
+            return existingDomains.includes(domain);
+        }
+
+        // Helper function to add domain to the domains list
+        function addDomainToList(domain) {
+            const organizationEmailDomains = document.getElementById('organization_email_domains');
+
+            // Check if we're already at the 3 domain limit
+            if (organizationEmailDomains.options.length >= 3) {
+                return false; // Cannot add more domains
+            }
+
+            // Validate domain
+            if (!validateDomainName(domain)) {
+                return false; // Invalid domain
+            }
+
+            // Check if domain is allowed
+            if (!allowedDomainName(domain)) {
+                return false; // Domain not allowed
+            }
+
+            // Add domain to the list
+            const newDomainOption = document.createElement('option');
+            newDomainOption.text = domain;
+            newDomainOption.value = domain;
+            newDomainOption.selected = true;
+            organizationEmailDomains.add(newDomainOption);
+
+            return true; // Successfully added
+        }
+
+        // Helper function to remove domain from the domains list if no other email uses it
+        function removeDomainIfUnused(domain) {
+            const organizationEmailAddresses = document.getElementById('organization_email_addresses');
+            const organizationEmailDomains = document.getElementById('organization_email_domains');
+
+            // Check if any other email addresses use this domain
+            const emailAddresses = Array.from(organizationEmailAddresses.options).map(option => option.value);
+            const domainsInUse = emailAddresses.map(email => extractDomainFromEmail(email));
+
+            // If no other email uses this domain, remove it
+            if (!domainsInUse.includes(domain)) {
+                // Find and remove the domain option
+                for (let i = 0; i < organizationEmailDomains.options.length; i++) {
+                    if (organizationEmailDomains.options[i].value === domain) {
+                        organizationEmailDomains.remove(i);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Add email address to the list
+        document.getElementById('addOrgEmailAddress').addEventListener('click', function() {
+            const organization_email_address = document.getElementById('organization_email_address');
+            const organization_email_addresses = document.getElementById('organization_email_addresses');
+            const new_email_address = document.createElement('option');
+            const isValid = validateEmailAddress(organization_email_address.value);
+            const errorElement = document.getElementById('organization-email-address-error');
+
+            if (isValid) {
+                // Check if email already exists
+                const existingEmails = Array.from(organization_email_addresses.options).map(option => option.value);
+                if (existingEmails.includes(organization_email_address.value)) {
+                    errorElement.textContent = '- Error: This email address has already been added.';
+                    return;
+                }
+
+                // Extract domain from email
+                const domain = extractDomainFromEmail(organization_email_address.value);
+
+                // Check if adding this domain would exceed the limit
+                if (!isDomainAlreadyInList(domain)) {
+                    const organizationEmailDomains = document.getElementById('organization_email_domains');
+                    if (organizationEmailDomains.options.length >= 3) {
+                        errorElement.textContent = '- Error: Adding this email would exceed the maximum of 3 domains.';
+                        return;
+                    }
+
+                    // Try to add the domain
+                    if (!addDomainToList(domain)) {
+                        errorElement.textContent = '- Error: Cannot add domain from this email address.';
+                        return;
+                    }
+                }
+
+                // Add email address to the list
+                new_email_address.text = organization_email_address.value;
+                new_email_address.value = organization_email_address.value;
+                new_email_address.selected = true;
+                organization_email_addresses.add(new_email_address);
+                organization_email_address.value = '';
+                errorElement.textContent = '';
+            } else {
+                errorElement.textContent = '- Error: Invalid email address.';
+            }
+        });
+
+        // Remove selected email address from the list
+        document.getElementById('removeOrgEmailAddress').addEventListener('click', function() {
+            let organization_email_addresses = document.getElementById('organization_email_addresses');
+            let selected_ranges = Array.from(organization_email_addresses.selectedOptions);
+
+            if (selected_ranges.length === 0) {
+                return; // Nothing selected to remove
+            }
+
+            // Store domains of emails being removed
+            const domainsToCheck = selected_ranges.map(option => extractDomainFromEmail(option.value));
+
+            // Remove selected items
+            selected_ranges.forEach(function(range) {
+                organization_email_addresses.remove(organization_email_addresses.selectedIndex);
+            });
+
+            // Update selected flag to remaining items
+            let ranges = organization_email_addresses.options;
+            for (let i = 0; i < ranges.length; i++) {
+                ranges[i].selected = true;
+            }
+
+            // Check and remove unused domains
+            domainsToCheck.forEach(domain => {
+                removeDomainIfUnused(domain);
+            });
+        });
+
+        // Add email domain to the list (keep existing functionality but add check for email addresses)
+        document.getElementById('addOrgEmailDomain').addEventListener('click', function() {
+            let organization_email_domain = document.getElementById('organization_email_domain');
+            let organization_email_domains = document.getElementById('organization_email_domains');
+            let new_email_domain = document.createElement('option');
+            let isValid = validateDomainName(organization_email_domain.value);
+            let isAllowed = allowedDomainName(organization_email_domain.value);
+
+            // Check if there are already 3 domains
+            if (organization_email_domains.options.length >= 3) {
+                document.getElementById('organization-email-domain-error').textContent = '- Error: You can only add up to 3 domains.';
+                return; // Prevent adding more domains
+            }
+
+            // Check if domain already exists
+            if (isDomainAlreadyInList(organization_email_domain.value)) {
+                document.getElementById('organization-email-domain-error').textContent = '- Error: This domain has already been added.';
+                return;
+            }
+
+            if (!isValid) {
+                document.getElementById('organization-email-domain-error').textContent = '- Error: Invalid domain name.';
+            } else if (!isAllowed) {
+                document.getElementById('organization-email-domain-error').textContent = '- Error: Domain name not allowed.';
+            } else {
+                new_email_domain.text = organization_email_domain.value;
+                new_email_domain.value = organization_email_domain.value;
+                new_email_domain.selected = true;
+                organization_email_domains.add(new_email_domain);
+                organization_email_domain.value = '';
+                document.getElementById('organization-email-domain-error').textContent = '';
+            }
+        });
+
+        // Remove selected domain from the list (with email address check)
+        document.getElementById('removeOrgEmailDomain').addEventListener('click', function() {
+            let organization_email_domains = document.getElementById('organization_email_domains');
+            let organization_email_addresses = document.getElementById('organization_email_addresses');
+            let selected_domains = Array.from(organization_email_domains.selectedOptions);
+
+            if (selected_domains.length === 0) {
+                return; // Nothing selected to remove
+            }
+
+            // Check if any selected domain is used by existing email addresses
+            const emailAddresses = Array.from(organization_email_addresses.options).map(option => option.value);
+            const domainsInUse = emailAddresses.map(email => extractDomainFromEmail(email));
+
+            const domainsToRemove = selected_domains.map(option => option.value);
+            const conflictingDomains = domainsToRemove.filter(domain => domainsInUse.includes(domain));
+
+            if (conflictingDomains.length > 0) {
+                document.getElementById('organization-email-domain-error').textContent =
+                    `- Error: Cannot remove domain(s) "${conflictingDomains.join(', ')}" because they are used by existing email addresses.`;
+                return;
+            }
+
+            // Remove selected items
+            selected_domains.forEach(function(domain) {
+                organization_email_domains.remove(organization_email_domains.selectedIndex);
+            });
+
+            // Update selected flag to remaining items
+            let ranges = organization_email_domains.options;
+            for (let i = 0; i < ranges.length; i++) {
+                ranges[i].selected = true;
+            }
+
+            // Clear error if the number of domains goes below 3
+            if (organization_email_domains.options.length < 3) {
+                document.getElementById('organization-email-domain-error').textContent = '';
+            }
+        });
+
+        // Filters
+        function applyFilter(filterType) {
+            // Get the current URL
+            let url = new URL(window.location.href);
+            const params = new URLSearchParams(url.search);
+
+            // Toggle the filter query parameter
+            if (filterType === 'created_by') {
+                if (params.has('created_by')) {
+                    params.delete('created_by');
+                    updateButtonState('created_by', false);
+                } else {
+                    params.set('created_by', 'on');
+                    updateButtonState('created_by', true);
+                }
+            }
+
+            if (filterType === 'se_email') {
+                if (params.has('se_email')) {
+                    params.delete('se_email');
+                    updateButtonState('se_email', false);
+                } else {
+                    params.set('se_email', 'on');
+                    updateButtonState('se_email', true);
+                }
+            }
+
+            // Reset to page 1 when applying filters
+            params.set('page', '1');
+
+            // Update the URL and reload the page
+            url.search = params.toString();
+            window.location.href = url.toString();
+        }
+
+        function updateButtonState(filterType, isActive) {
+            const button = document.getElementById(`filter_${filterType}_btn`);
+
+            if (isActive) {
+                button.classList.remove('bg-secondary');
+                button.classList.add('bg-primary');
+            } else {
+                button.classList.remove('bg-primary');
+                button.classList.add('bg-secondary');
+            }
+        }
+
+        window.onload = function() {
+            // Check if filters are applied and toggle the button state accordingly
+            if (window.location.search.includes('created_by=on')) {
+                updateButtonState('created_by', true);
+            } else {
+                updateButtonState('created_by', false);
+            }
+
+            if (window.location.search.includes('se_email=on')) {
+                updateButtonState('se_email', true);
+            } else {
+                updateButtonState('se_email', false);
+            }
+        }
+
+        new_profile_form.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const fieldsToValidate = [
+                {
+                    field: document.getElementById('vivun_activity'),
+                    value: document.getElementById('vivun_activity').value.trim(),
+                    errorElement: document.getElementById('vivun_activity_error'),
+                    validate: value => validateVivunActivity(value),
+                    errorMessage: 'Please enter a valid and unique Vivun Activity ID (6 digits).'
+                },
+                {
+                    field: document.getElementById('organization_name'),
+                    value: document.getElementById('organization_name').value.trim(),
+                    errorElement: document.getElementById('organization_name_error'),
+                    validate: value => Promise.resolve(value !== ''), // Wrap sync check in a Promise
+                    errorMessage: 'Please enter an organization name.'
+                },
+                {
+                    field: document.getElementById('organization_email_addresses'),
+                    value: document.getElementById('organization_email_addresses').selectedOptions,
+                    errorElement: document.getElementById('organization_email_addresses_error'),
+                    validate: selectedOptions => Promise.resolve(selectedOptions.length > 0),
+                    errorMessage: 'Please select at least one email address.'
+                },
+                {
+                    field: document.getElementById('organization_email_domains'),
+                    value: document.getElementById('organization_email_domains').selectedOptions,
+                    errorElement: document.getElementById('organization_email_domains_error'),
+                    validate: selectedOptions => Promise.resolve(selectedOptions.length > 0),
+                    errorMessage: 'Please select at least one email domain.'
+                }
+            ];
+
+            // Reset errors
+            Promise.all(fieldsToValidate.map(field =>
+                Promise.resolve(field.validate(field.value))
+                    .then(result => {
+                        const isValid = typeof result === 'object' ? result.valid : result;
+                        const message = typeof result === 'object' ? result.message : field.errorMessage;
+
+                        if (!isValid) {
+                            field.field.classList.add('is-invalid');
+                            field.errorElement.textContent = message;
+                            field.errorElement.style.display = 'block';
+                            return false;
+                        } else {
+                            // Clean up success state
+                            field.field.classList.remove('is-invalid');
+                            field.errorElement.style.display = 'none';
+                            field.errorElement.textContent = '';
+                            return true;
+                        }
+                    })
+                    .catch(() => {
+                        field.field.classList.add('is-invalid');
+                        field.errorElement.textContent = field.errorMessage;
+                        field.errorElement.style.display = 'block';
+                        return false;
+                    })
+            )).then(results => {
+                if (results.every(valid => valid)) {
+                    new_profile_form.submit();
+                }
+            });
+
+        });
+
+        function resetForm() {
+            const organizationEmailAddressesField = document.getElementById('organization_email_addresses');
+            const organizationEmailDomainsField = document.getElementById('organization_email_domains');
+            const ipRangesField = document.getElementById('ip_ranges');
+            let threatProfileUniqueId = document.getElementById('threat_profile_unique_id');
+
+            threatProfileUniqueId.value = '';
+
+            new_profile_form.reset();
+
+            while (organizationEmailAddressesField.length > 0) {
+                organizationEmailAddressesField.remove(0);
+            }
+
+            while (organizationEmailDomainsField.length > 0) {
+                organizationEmailDomainsField.remove(0);
+            }
+
+            while (ipRangesField.length > 0) {
+                ipRangesField.remove(0);
+            }
+
+            new_profile_form.action = addProfileUrl;
+
+            // Reset validation states
+            const invalidElements = new_profile_form.querySelectorAll('.is-invalid');
+            invalidElements.forEach(el => el.classList.remove('is-invalid'));
+
+            const errorMessages = new_profile_form.querySelectorAll('.invalid-feedback');
+            errorMessages.forEach(el => {
+                el.style.display = 'none';
+                el.textContent = '';
+            });
+
+            // Also remove old options from all multi-selects
+            ['organization_email_addresses', 'organization_email_domains', 'ip_ranges'].forEach(id => {
+                const select = document.getElementById(id);
+                if (select) select.innerHTML = ''; // Clear all options
+            });
+
+            document.getElementById('profileModalLabel').innerText = 'Add Threat Profile';
+        }
+
+        // Add profile
+
+        // Add range to the list
+        document.getElementById('addRangeBtn').addEventListener('click', function() {
+            const ip_range = document.getElementById('ip_range');
+            const ip_ranges = document.getElementById('ip_ranges');
+            const new_range = document.createElement('option');
+            const validationResult = validateIPRange(ip_range.value);
+
+            // Check if the entered range is valid
+            if (validationResult.valid) {
+                // Check if the range has a /24 subnet
+                if (ip_range.value.includes('/24')) {
+                    // Count how many /24 subnets are already in the select element
+                    let count24 = 0;
+                    for (let i = 0; i < ip_ranges.options.length; i++) {
+                        if (ip_ranges.options[i].value.includes('/24')) {
+                            count24++;
+                        }
+                    }
+
+                    // Check if there are less than 4 /24 subnets already
+                    if (count24 < 4) {
+                        new_range.text = ip_range.value;
+                        new_range.value = ip_range.value;
+                        new_range.selected = true;
+                        ip_ranges.add(new_range);
+                        ip_range.value = ''; // Clear the input field
+                        document.getElementById('range-error').textContent = ''; // Clear any existing error
+                    } else {
+                        // If there are already 4 /24 subnets, display error
+                        document.getElementById('range-error').textContent = '- Error: Maximum of 4 ranges with /24 subnet allowed.';
+                    }
+                } else {
+                    // If the subnet is not /24, allow any other subnets and add the range
+                    new_range.text = ip_range.value;
+                    new_range.value = ip_range.value;
+                    new_range.selected = true;
+                    ip_ranges.add(new_range);
+                    ip_range.value = ''; // Clear the input field
+                    document.getElementById('range-error').textContent = ''; // Clear any existing error
+                }
+            } else {
+                // Display specific error messages based on validation failure type
+                if (validationResult.error === 'network') {
+                    document.getElementById('range-error').textContent = `- Error: IP address is not the network address for this subnet. Use ${validationResult.correctNetwork} instead.`;
+                } else if (validationResult.error === 'private') {
+                    document.getElementById('range-error').textContent = '- Error: Private IP ranges are not allowed. Please use a public subnet.';
+                } else {
+                    // General error for format issues
+                    document.getElementById('range-error').textContent = '- Error: Please check IP range in the format: 89.34.76.10/24 and should be a public subnet.';
+                }
+            }
+
+        });
+
+        // Remove selected range(s) from the list
+        document.getElementById('removeRangeBtn').addEventListener('click', function() {
+            const ip_ranges = document.getElementById('ip_ranges');
+            const selected_ranges = Array.from(ip_ranges.selectedOptions);
+
+            // Remove selected items
+            selected_ranges.forEach(function(range) {
+                ip_ranges.remove(ip_ranges.selectedIndex);
+            })
+
+            //Update selected flag to remaining items
+            const ranges = ip_ranges.options;
+            for (let i = 0; i < ranges.length; i++) {
+                ranges[i].selected = true;
+            }
+        });
+
+        // IP range validation
+        function validateIPRange(ipRange) {
+            // Regex pattern for valid IP addresses with subnet mask (CIDR)
+            // Each octet is between 1 and 255, and the subnet is between /24 and /32
+            let pattern = /^((25[0-5]|2[0-5][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-5][0-9]|[01]?[0-9][0-9]?)\/(2[4-9]|3[0-2])$/;
+
+            // Check if IP range matches the basic pattern
+            if (!pattern.test(ipRange)) {
+                return { valid: false, error: 'format' };
+            }
+
+            // Extract the IP and subnet from the range
+            let [ip, subnet] = ipRange.split('/');
+            let octets = ip.split('.').map(Number);
+            let subnetMask = parseInt(subnet);
+
+            // Check for 0.0.0.0
+            if (ip === '0.0.0.0') {
+                return { valid: false, error: 'format' };
+            }
+
+            // Check for private subnets
+            // Private subnets:
+            // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+            if (
+                (octets[0] === 10) || // 10.x.x.x
+                (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) || // 172.16.x.x - 172.31.x.x
+                (octets[0] === 192 && octets[1] === 168) // 192.168.x.x
+            ) {
+                return { valid: false, error: 'private' };
+            }
+
+            // Check if the IP address is the network address for the given subnet
+            let correctNetwork = getNetworkAddress(ip, subnetMask);
+            if (`${ip}/${subnetMask}` !== correctNetwork) {
+                return { valid: false, error: 'network', correctNetwork };
+            }
+
+            return { valid: true };
+        }
+
+        // Convert IP to 32-bit unsigned integer using BigInt
+        function ipToInt(ip) {
+            let octets = ip.split('.').map(Number);
+            return BigInt(octets[0]) << 24n | BigInt(octets[1]) << 16n | BigInt(octets[2]) << 8n | BigInt(octets[3]);
+        }
+
+        // Check if an IP is the network address for a given subnet mask
+        function isNetworkAddress(ip, subnetMask) {
+            let ipInt = ipToInt(ip);
+            let maskInt = (BigInt(0xFFFFFFFF) << BigInt(32 - subnetMask)) & BigInt(0xFFFFFFFF);
+            let networkInt = ipInt & maskInt;
+            return ipInt === networkInt;
+        }
+
+        // Get the correct network address for a given IP and subnet mask
+        function getNetworkAddress(ip, subnetMask) {
+            let ipInt = ipToInt(ip);
+            let maskInt = (BigInt(0xFFFFFFFF) << BigInt(32 - subnetMask)) & BigInt(0xFFFFFFFF);
+            let networkInt = ipInt & maskInt;
+
+            // Convert back to dotted decimal notation
+            return [
+                Number((networkInt >> 24n) & 0xFFn),
+                Number((networkInt >> 16n) & 0xFFn),
+                Number((networkInt >> 8n) & 0xFFn),
+                Number(networkInt & 0xFFn)
+            ].join('.') + '/' + subnetMask;
+        }
+
+        // Email address validation
+        function validateEmailAddress(emailAddress) {
+            const pattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            return pattern.test(emailAddress);
+        }
+
+        // Domain name validation
+        function validateDomainName(domainName) {
+            let pattern =/^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,9}$/i;
+            return pattern.test(domainName);
+        }
+
+        // Check if domain name is allowed
+        function allowedDomainName(domainName) {
+            blacklist_domains = ['yahoo.com', 'gmail.com', 'aol.com', 'hotmail.com', 'outlook.com']
+            return blacklist_domains.filter(val => val.includes(domainName)).length == 0
+        }
+
+        // Validate Vivun activity ID and check uniqueness
+        function validateVivunActivity(vivunActivityValue) {
+            const validPattern = /^[0-9]{6}$/; // 6 digits, allowing leading zeros
+
+            if (!validPattern.test(vivunActivityValue)) {
+                return Promise.resolve({ valid: false, message: "Please enter a valid Vivun Activity ID (6 digits)." });
+            }
+
+            // Now, check if the vivun_activity is unique
+            return checkVivunActivityUniqueness(vivunActivityValue);
+        }
+
+        // Function to check Vivun Activity uniqueness via AJAX
+        function checkVivunActivityUniqueness(vivunActivityValue) {
+            let url = new URL('/vdr/threat-profile/check-vivun-activity/', window.location.origin);
+            let params = new URLSearchParams({ vivun_activity: vivunActivityValue });
+
+            const threatProfileUniqueId = document.getElementById('threat_profile_unique_id')?.value;
+            if (threatProfileUniqueId && threatProfileUniqueId.trim() !== '') {
+                params.append('threat_profile_unique_id', threatProfileUniqueId);
+            }
+
+            url.search = params.toString();
+
+            return fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    return {
+                        valid: !!data.valid,
+                        message: data.valid ? '' : data.message || 'Vivun Activity ID is not unique.'
+                    };
+                })
+                .catch(() => {
+                    return {
+                        valid: false,
+                        message: 'Error checking Vivun Activity ID.'
+                    };
+                });
+        }
+
+        // Edit profile
+        function getParentByTagName(node, tagname) {
+            let parent;
+            if (node === null || tagname === '') return;
+            parent  = node.parentNode;
+            tagname = tagname.toUpperCase();
+
+            while (parent.tagName !== "HTML") {
+                if (parent.tagName === tagname) {
+                    return parent;
+                }
+                parent = parent.parentNode;
+            }
+
+            return parent;
+        }
+
+        function fillEditForm(btn, updateUrl, threat_profile_unique_id) {
+            resetForm();
+            let profileModal = new bootstrap.Modal(document.getElementById('profileModal'));
+
+            // Row fields
+            let row = getParentByTagName(btn, 'tr');
+            let organizationName = row.querySelector('[data-column="organization_name"]').innerText;
+            let organizationEmailDomains = row.querySelector('[data-column="organization_email_domains"]').innerText;
+            let organizationDomain = row.querySelector('[data-column="organization_domain"]').innerText;
+            let seEmail = row.querySelector('[data-column="se_email"]').innerText;
+            let ipRanges = row.querySelector('[data-column="ip_ranges"]').innerText;
+            let organizationEmailAddresses = row.querySelector('[data-column="organization_email_addresses"]').innerText;
+            let vivunActivity = row.querySelector('[data-column="vivun_activity"]').value;
+
+            // Form fields
+            let threatProfileUniqueId = document.getElementById('threat_profile_unique_id');
+            let organizationNameField = document.getElementById('organization_name');
+            let seEmailField = document.getElementById('se_email');
+            let organizationEmailAddressesField = document.getElementById('organization_email_addresses');
+            let organizationEmailDomainsField = document.getElementById('organization_email_domains');
+            let ipRangesField = document.getElementById('ip_ranges');
+            let organizationDomainField = document.getElementById('organization_domain');
+            let vivunActivityField = document.getElementById('vivun_activity');
+
+            new_profile_form.style.display = 'block';
+            new_profile_form.action = updateUrl;
+
+            // Map Single value fields
+            organizationNameField.value = organizationName
+            seEmailField.value = seEmail
+            organizationDomainField.value = organizationDomain
+            vivunActivityField.value = vivunActivity
+            threatProfileUniqueId.value = threat_profile_unique_id
+
+            // Map multiple value fields
+            organizationEmailAddresses = organizationEmailAddresses.split('\n');
+            organizationEmailAddresses.forEach(function(mail, i) {
+                if(mail) {
+                    email_option = document.createElement('option');
+                    email_option.text = mail;
+                    email_option.value = mail;
+                    email_option.selected = true;
+                    organizationEmailAddressesField.add(email_option);
+                }
+            })
+
+            organizationEmailDomains = organizationEmailDomains.split('\n');
+            organizationEmailDomains.forEach(function(domain, i) {
+                if(domain) {
+                    domain_option = document.createElement('option');
+                    domain_option.text = domain;
+                    domain_option.value = domain;
+                    domain_option.selected = true;
+                    organizationEmailDomainsField.add(domain_option);
+                }
+            });
+
+            ipRanges = ipRanges.split('\n');
+            ipRanges.forEach(function(range, i) {
+                if(range) {
+                    range_option = document.createElement('option');
+                    range_option.text = range;
+                    range_option.value = range;
+                    range_option.selected = true;
+                    ipRangesField.add(range_option);
+                }
+            })
+
+            document.getElementById('profileModalLabel').innerText = `Edit ${organizationName}`;
+            profileModal.show();
+        }
+
+        // Handle enter
+        // Function to trigger the 'Add' button on Enter key press
+        function handleEnterKey(event, buttonId) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                document.getElementById(buttonId).click(); // Trigger the corresponding Add button click
+            }
+        }
+
+        // Adding event listeners to the input fields
+        document.getElementById('organization_email_address').addEventListener('keydown', function(event) {
+            handleEnterKey(event, 'addOrgEmailAddress');
+        });
+
+        document.getElementById('organization_email_domain').addEventListener('keydown', function(event) {
+            handleEnterKey(event, 'addOrgEmailDomain');
+        });
+
+        document.getElementById('ip_range').addEventListener('keydown', function(event) {
+            handleEnterKey(event, 'addRangeBtn');
+        });
+
+        document.getElementById('profileModal').addEventListener('hidden.bs.modal', function () {
+            resetForm();
+        });
+
+        // ====================================
+        // SE Email Multi-Select Filter Logic
+        // ====================================
+
+        // Search functionality for SE emails
+        const seEmailSearchInput = document.getElementById('seEmailSearchInput');
+        if (seEmailSearchInput) {
+            seEmailSearchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const seEmailItems = document.querySelectorAll('.se-email-item');
+                
+                seEmailItems.forEach(function(item) {
+                    const label = item.querySelector('.se-email-label');
+                    const email = label.textContent.toLowerCase();
+                    
+                    if (email.includes(searchTerm)) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // Select All functionality
+        const selectAllBtn = document.getElementById('selectAllSeEmails');
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', function() {
+                const visibleCheckboxes = document.querySelectorAll('.se-email-item:not([style*="display: none"]) .se-email-checkbox');
+                visibleCheckboxes.forEach(function(checkbox) {
+                    checkbox.checked = true;
+                });
+            });
+        }
+
+        // Clear All functionality
+        const clearAllBtn = document.getElementById('clearAllSeEmails');
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', function() {
+                const checkboxes = document.querySelectorAll('.se-email-checkbox');
+                checkboxes.forEach(function(checkbox) {
+                    checkbox.checked = false;
+                });
+            });
+        }
+
+        // Apply SE Email Filter
+        const applySeEmailFilterBtn = document.getElementById('applySeEmailFilter');
+        if (applySeEmailFilterBtn) {
+            applySeEmailFilterBtn.addEventListener('click', function() {
+                const checkedEmails = [];
+                const checkboxes = document.querySelectorAll('.se-email-checkbox:checked');
+                
+                checkboxes.forEach(function(checkbox) {
+                    checkedEmails.push(checkbox.value);
+                });
+
+                // Build the new URL
+                let url = new URL(window.location.href);
+                const params = new URLSearchParams(url.search);
+
+                if (checkedEmails.length > 0) {
+                    params.set('se_emails', checkedEmails.join(','));
+                    // Clear the single se_email filter when using multi-select
+                    params.delete('se_email');
+                } else {
+                    params.delete('se_emails');
+                }
+
+                // Reset to page 1 when applying filters
+                params.set('page', '1');
+
+                // Update the URL and reload
+                url.search = params.toString();
+                window.location.href = url.toString();
+            });
+        }
+
+        // Clear SE Email Filter button (inside dropdown)
+        const clearSeEmailFilterBtn = document.getElementById('clearSeEmailFilter');
+        if (clearSeEmailFilterBtn) {
+            clearSeEmailFilterBtn.addEventListener('click', function() {
+                let url = new URL(window.location.href);
+                const params = new URLSearchParams(url.search);
+                
+                params.delete('se_emails');
+                params.set('page', '1');
+                
+                url.search = params.toString();
+                window.location.href = url.toString();
+            });
+        }
+
+        // Update SE Email filter icon color based on current filter
+        function updateSeEmailFilterState() {
+            const seEmailFilterDropdown = document.getElementById('seEmailFilterDropdown');
+            if (seEmailFilterDropdown) {
+                const selectedCount = document.querySelectorAll('.se-email-checkbox:checked').length;
+                
+                if (selectedCount > 0) {
+                    seEmailFilterDropdown.classList.remove('text-secondary');
+                    seEmailFilterDropdown.classList.add('text-primary');
+                } else {
+                    seEmailFilterDropdown.classList.remove('text-primary');
+                    seEmailFilterDropdown.classList.add('text-secondary');
+                }
+            }
+        }
+
+        // Initialize filter state on page load
+        updateSeEmailFilterState();
+    </script>
+{% endblock %}

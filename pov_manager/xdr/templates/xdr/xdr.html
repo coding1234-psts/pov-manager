@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+    {% include 'nav.html' with app="xdr" %}
+    <div class="container-fluid p-5">
+        <h1>XDR - Tenants</h1>
+        <h5>Number of tenants {{ count_tenants }}</h5>
+        <form action=" url 'xdr-list' " method="get" id="query_actions_form">
+            {% if location in "pov,jitlab" %}
+                {% csrf_token %}
+                <div class="row">
+                    <div class="col-md-12">
+                        <label for="action">Action:</label>
+                        <select id="action" name="action" class="mx-2">
+                            <option value="" selected="">-----------------</option>
+                            <option value="garbage_collect">Garbage Collect</option>
+                        </select>
+                        <button type="button" name="submitted_action" class="btn btn-primary btn-sm" title="Run the selected action" onclick="run_action()">Go</button>
+                    </div>
+                </div>
+            {% endif %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" scope="col" class="align-bottom"><input type="checkbox" id="toogle_all_checkbox"></th>
+                            <th rowspan="2" scope="col" class="align-top" style="width:12%">ID
+                                <button type="submit" name="sort" value="id" class="btn btn-link btm-sm">
+                                    {% if sort == "id" %}
+                                        {% if order == -1 %}
+                                            <input type="hidden" name="order" value="1">
+                                            <i class="bi bi-arrow-up"></i>
+                                        {% else %}
+                                            <input type="hidden" name="order" value="-1">
+                                            <i class="bi bi-arrow-down"></i>
+                                        {% endif %}
+                                    {% else %}
+                                        <i class="bi bi-arrow-down-up"></i>
+                                    {% endif %}
+                                </button>
+
+                                <br>
+                                <div class="input-group mb-2">
+                                    <input type="search" name="search_id" class="form-control" value="{{ search_id|default_if_none:'' }}">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-search"></i>
+                                    </button>
+                                </div>
+
+                            </th>
+                            <th rowspan="2" scope="col" class="align-top" style="width:30%">Name
+                                <button type="submit" name="sort" value="name" class="btn btn-link btm-sm">
+                                    {% if sort == "name" %}
+                                        {% if order == -1 %}
+                                            <input type="hidden" name="order" value="1">
+                                            <i class="bi bi-arrow-up"></i>
+                                        {% else %}
+                                            <input type="hidden" name="order" value="-1">
+                                            <i class="bi bi-arrow-down"></i>
+                                        {% endif %}
+                                    {% else %}
+                                        <i class="bi bi-arrow-down-up"></i>
+                                    {% endif %}
+                                </button>
+
+                                <br>
+                                <div class="input-group mb-2">
+                                    <input type="search" name="search_name" class="form-control" value="{{ search_name|default_if_none:'' }}">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-search"></i>
+                                    </button>
+                                </div>
+
+                            </th>
+                            <th rowspan="2" scope="col" class="align-top">Age
+                                <button type="submit" name="sort" value="age" class="btn btn-link btm-sm">
+                                    {% if sort == "age" %}
+                                        {% if order == -1 %}
+                                            <input type="hidden" name="order" value="1">
+                                            <i class="bi bi-arrow-up"></i>
+                                        {% else %}
+                                            <input type="hidden" name="order" value="-1">
+                                            <i class="bi bi-arrow-down"></i>
+                                        {% endif %}
+                                    {% else %}
+                                        <i class="bi bi-arrow-down-up"></i>
+                                    {% endif %}
+                                </button>
+                            </th>
+                            <th rowspan="2" scope="col" class="align-top">Expiry Date
+                                <button type="submit" name="sort" value="expires_at" class="btn btn-link btm-sm">
+                                    {% if sort == "expires_at" %}
+                                        {% if order == -1 %}
+                                            <input type="hidden" name="order" value="1">
+                                            <i class="bi bi-arrow-up"></i>
+                                        {% else %}
+                                            <input type="hidden" name="order" value="-1">
+                                            <i class="bi bi-arrow-down"></i>
+                                        {% endif %}
+                                    {% else %}
+                                        <i class="bi bi-arrow-down-up"></i>
+                                    {% endif %}
+                                </button>
+                            </th>
+                            <th rowspan="2" scope="col" class="align-top">Remaining days</th>
+                            <th colspan="4" scope="col" class="text-center align-top">Environments</th>
+                            {% if location in "pov,jitlab" %}
+                                <th rowspan="2" scope="col" class="text-center align-top" title="Ready for garbage collector">GC
+                                <button type="submit" name="sort" value="gc" class="btn btn-link btm-sm">
+                                    {% if sort == "gc" %}
+                                        {% if order == 1 %}
+                                            <input type="hidden" name="order" value="-1">
+                                            <i class="bi bi-arrow-up"></i>
+                                        {% else %}
+                                            <input type="hidden" name="order" value="1">
+                                            <i class="bi bi-arrow-down"></i>
+                                        {% endif %}
+                                    {% else %}
+                                        <i class="bi bi-arrow-down-up"></i>
+                                    {% endif %}
+                                </button>
+                                </th>
+                            {% endif %}
+                            <th rowspan="2" scope="col" class="text-center align-top">Actions</th>
+                        </tr>
+                        <tr>
+                            <th scope="col" class="align-middle">Production
+                                <button class="btn btn-link form-check-label" type="submit" name="environment" value="prod" title="Filter only enabled tenants running on Production environment">
+                                    {% if environment == "prod" %}
+                                        <i class="bi bi-filter-circle-fill"></i>
+                                    {% else %}
+                                        <i class="bi bi-filter-circle"></i>
+                                    {% endif %}
+                                </button>
+                            </th>
+                            <th scope="col" class="align-middle">Delta
+                                <button class="btn btn-link form-check-label" type="submit" name="environment" value="delta" title="Filter only enabled tenants running on Delta environment">
+                                    {% if environment == "delta" %}
+                                        <i class="bi bi-filter-circle-fill"></i>
+                                    {% else %}
+                                        <i class="bi bi-filter-circle"></i>
+                                    {% endif %}
+                                </button>
+                            </th>
+                            <th scope="col" class="align-middle">Echo
+                                <button class="btn btn-link form-check-label" type="submit" name="environment" value="echo" title="Filter only enabled tenants running on Echo environment">
+                                    {% if environment == "echo" %}
+                                        <i class="bi bi-filter-circle-fill"></i>
+                                    {% else %}
+                                        <i class="bi bi-filter-circle"></i>
+                                    {% endif %}
+                                </button>
+                            </th>
+                            <th scope="col" class="align-middle">Foxtrot
+                                <button class="btn btn-link form-check-label" type="submit" name="environment" value="foxtrot" title="Filter only enabled tenants running on Foxtrot environment">
+                                    {% if environment == "foxtrot" %}
+                                        <i class="bi bi-filter-circle-fill"></i>
+                                    {% else %}
+                                        <i class="bi bi-filter-circle"></i>
+                                    {% endif %}
+                                </button>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for tenant in tenants %}
+                        <tr>
+                            <td><input type="checkbox" class="select_tenant" name="selected_tenant" value="{{ tenant.id }}"></td>
+                            <td class="align-middle"><a href="{% url 'xdr_tenant_details' tenant_id=tenant.id %}" class="text-decoration-none text-dark btn">{{ tenant.id }}</a></td>
+                            <td class="align-middle"><a href="{% url 'xdr_tenant_details' tenant_id=tenant.id %}" class="text-decoration-none text-dark btn">{{ tenant.name }}</a></td>
+                            <td class="align-middle">{{ tenant.age }}{% if tenant.age == 1 %} day {% else %} days {% endif %}</td>
+                            <td class="align-middle">{{ tenant.expires_at|default_if_none:'' }}</td>
+                            <td class="align-middle">{{ tenant.remaining_days|default_if_none:'' }}</td>
+                            <td class="align-middle">
+                                {% if tenant.enabled_on_prod %}
+                                    <span class="badge text-bg-success mx-1">Enabled</span>
+                                {% else %}
+                                    <span class="badge text-bg-danger mx-1">Disabled</span>
+                                {% endif %}
+                            </td>
+                            <td class="align-middle">
+                                {% if tenant.enabled_on_delta %}
+                                    <span class="badge text-bg-success mx-1">Enabled</span>
+                                {% else %}
+                                    <span class="badge text-bg-danger mx-1">Disabled</span>
+                                {% endif %}
+                            </td>
+                            <td class="align-middle">
+                                {% if tenant.enabled_on_echo %}
+                                    <span class="badge text-bg-success mx-1">Enabled</span>
+                                {% else %}
+                                    <span class="badge text-bg-danger mx-1">Disabled</span>
+                                {% endif %}
+                            </td>
+                            <td class="align-middle">
+                                {% if tenant.enabled_on_foxtrot %}
+                                    <span class="badge text-bg-success mx-1">Enabled</span>
+                                {% else %}
+                                    <span class="badge text-bg-danger mx-1">Disabled</span>
+                                {% endif %}
+                            </td>
+                            {% if location in "pov,jitlab" %}
+                                <td class="align-middle">
+                                    {% if tenant.gc %}
+                                        <span class="badge text-bg-warning mx-1">Yes</span>
+                                    {% else %}
+                                        <span class="badge text-bg-info mx-1">No</span>
+                                    {% endif %}
+                                </td>
+                            {% endif %}
+                            <td class="text-center align-middle">
+                                <a href="https://xtm.taegis.secureworks.com/tenants/{{ tenant.id }}/tenant-details" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener noreferrer">Open in TM</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
+
+        <nav aria-label="Pagination">
+            <ul class="pagination justify-content-center">
+                {% if has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?ttype={{ ttype|default_if_none:'' }}&search_id={{ search_id|default_if_none:'' }}&search_name={{ search_name|default_if_none:'' }}&environment={{ environment|default_if_none:'' }}&sort={{ sort }}&order={{ order }}&page={{ current_page|add:-1 }}">Previous</a>
+                    </li>
+                {% endif %}
+
+                <li class="page-item active"><a class="page-link">Page {{ current_page }} of {{ total_pages }}</a></li>
+
+                {% if has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?ttype={{ ttype|default_if_none:'' }}&search_id={{ search_id|default_if_none:'' }}&search_name={{ search_name|default_if_none:'' }}&environment={{ environment|default_if_none:'' }}&sort={{ sort }}&order={{ order }}&page={{ current_page|add:1 }}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+
+    </div>
+{% endblock %}
+
+{% block footer %}
+    <script>
+        document.getElementById('toogle_all_checkbox').addEventListener('click', function(event) {
+            let toogleAllCheckbox = document.getElementById('toogle_all_checkbox');
+            if (toogleAllCheckbox.checked == true) {
+                document.querySelectorAll('input[class="select_tenant"]').forEach(e => e.checked = true);
+            } else {
+                document.querySelectorAll('input[class="select_tenant"]').forEach(e => e.checked = false);
+            }
+        });
+
+        function run_action() {
+            form = document.getElementById('query_actions_form');
+            form.method='post';
+            form.action='{% url "xdr-tenants-submitted-actions" %}';
+            form.submit();
+        }
+    </script>
+{% endblock %}

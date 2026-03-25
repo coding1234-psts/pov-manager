@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block head %}
+<style>
+    .card {
+        width: 200px;
+    }
+    .card-icon {
+        font-size: 7rem;
+    }
+    .card-container {
+        display: fixed:
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center mb-5">Orchestrator</h1>
+
+    <div class="card-container">
+        <div class="card text-center">
+            <a href="{% url 'advancedsearch_list' %}">
+                <div class="card-body">
+                    <i class="bi bi-search card-icon"></i>
+                    <h5 class="card-title mt-3">Advanced search</h5>
+                </div>
+            </a>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

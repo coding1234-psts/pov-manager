@@ -1,0 +1,7 @@
+__pycache__/
+.pyc
+.idea
+.env
+ctu-reports/*.zip
+# Local Mongo bootstrap (copy from init-mongo.js.example)
+mongo_db/init-mongo.js

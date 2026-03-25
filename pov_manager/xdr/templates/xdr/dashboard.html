@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block content %}
+    {% include 'nav.html' with app="xdr" %}
+    <div class="container-fluid my-5">
+        <h1 class="text-center mb-5">Dashboard</h1>
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">JiTLab tenants</h5>
+                        <h6>Total count {{ total_jitlab_tenants }}</h6>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">XDR PoV service tenants</h5>
+                        <h6>Total count {{ total_xdr_pov_tenants }}</h6>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">MXDR PoV service tenants</h5>
+                        <h6>Total count {{ total_mxdr_pov_tenants }}</h6>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">MXDR Elite PoV service tenants</h5>
+                        <h6>Total count {{ total_mxdr_elite_pov_tenants }}</h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

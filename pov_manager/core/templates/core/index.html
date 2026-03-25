@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+    <div class="d-flex justify-content-center align-items-center vh-100">
+        <div class="text-center">
+<!--            <a href="url 'xdr-list'" class="btn btn-primary btn-lg px-5 py-4 fs-1 mx-1">-->
+<!--                <i class="bi bi-journal-bookmark-fill"></i> XDR Tenants-->
+<!--            </a>-->
+            <a href="{% url 'threat_profile' %}?created_by=on" class="btn btn-success btn-lg px-5 py-4 fs-1 mx-1">
+                <i class="bi bi-shield-fill-plus"></i> Threat Profile
+            </a>
+        </div>
+    </div>
+{% endblock %}

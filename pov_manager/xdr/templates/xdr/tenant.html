@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+    {% include 'nav.html' with app="xdr" %}
+    <div class="container py-4">
+        <h1 class="text-center mb-4">{{ tenant.name }}</h1>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <h2 class="pb-2 border-bottom">General Information</h2>
+                <p><b>Created date</b>: {{ created_at|default_if_none:'' }}</p>
+                <p><b>Age</b>: {{ age }}{% if age == 1 %} day {% else %} days {% endif %}</p>
+                <p><b>Expiry date</b>: {{ expires_at|default_if_none:'' }}</p>
+                <p><b>Remaining days</b>: {{ remaining_days|default_if_none:'' }}</p>
+                <p><b>Last update</b>: {{ updated_at|default_if_none:'' }}</p>
+                <p><b>Support</b>:
+                    {% if support %}
+                        <span class="badge text-bg-success mx-1">Enabled</span>
+                    {% else %}
+                        <span class="badge text-bg-danger mx-1">Disabled</span>
+                    {% endif %}
+                </p>
+                <p><b>Description</b>: {{ tenant.description }}</p>
+            </div>
+            <div class="col-md-6 mb-3">
+                <h2 class="pb-2 border-bottom">Environments</h2>
+                <p><b>Production</b>:
+                    {% if tenant.enabled_on_prod %}
+                        <span class="badge text-bg-success mx-1">Enabled</span>
+                    {% else %}
+                        <span class="badge text-bg-danger mx-1">Disabled</span>
+                    {% endif %}
+                </p>
+                <p><b>Delta</b>:
+                    {% if tenant.enabled_on_delta %}
+                        <span class="badge text-bg-success mx-1">Enabled</span>
+                    {% else %}
+                        <span class="badge text-bg-danger mx-1">Disabled</span>
+                    {% endif %}
+                </p>
+                <p><b>Echo</b>:
+                    {% if tenant.enabled_on_echo %}
+                        <span class="badge text-bg-success mx-1">Enabled</span>
+                    {% else %}
+                        <span class="badge text-bg-danger mx-1">Disabled</span>
+                    {% endif %}
+                </p>
+                <p><b>Foxtrot</b>:
+                    {% if tenant.enabled_on_foxtrot %}
+                        <span class="badge text-bg-success mx-1">Enabled</span>
+                    {% else %}
+                        <span class="badge text-bg-danger mx-1">Disabled</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="col-md-6 mb-3">
+                <h2 class="pb-2 border-bottom">Labels</h2>
+                {% if labels %}
+                    <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Value</th>
+                        </tr>
+                    </thead>
+                        <tbody>
+                            {% for label in tenant.labels %}
+                                <tr>
+                                    <td>{{ label.name }}</td>
+                                    <td>{{ label.value }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>There are no labels added to the tenant.</p>
+                {% endif %}
+            </div>
+            <div class="col-md-6 mb-3">
+                <h2 class="pb-2 border-bottom">Services</h2>
+                {% if tenant.granted_services %}
+                    <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Description</th>
+                        </tr>
+                    </thead>
+                        <tbody>
+                            {% for service in tenant.granted_services %}
+                                <tr>
+                                    <td>{{ service.name }}</td>
+                                    <td>{{ service.description }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>There are no services added to the tenant.</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12 mb-3">
+                <h2 class="pb-2 border-bottom">Alerts in Delta</h2>
+                {% if alerts %}
+                    <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Created Date</th>
+                            <th scope="col">First seen</th>
+                            <th scope="col">Description</th>
+                        </tr>
+                    </thead>
+                        <tbody>
+                            {% for alert in alerts %}
+                                <tr>
+                                    <td>{{ alert.name }}</td>
+                                    <td>{{ alert.created_at|default_if_none:'' }}</td>
+                                    <td>{{ alert.first_seen_at|default_if_none:'' }}</td>
+                                    <td>{{ alert.description|default_if_none:'' }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>There are no alerts in delta.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="container my-5">
+        <h2>Advanced search queries</h2>
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="tenant_id" value="{{ tenant.id }}">
+            <!--  Table to list saved advanced search queries -->
+            <table class="table table-bordered table-hover">
+                <thead>
+                    <tr>
+                        <th scope="col"></th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Query</th>
+                        <th scope="col">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for search in advanced_searches %}
+                        <tr>
+                            <td><input type="checkbox" name="selected_searches" value="{{ search.id }}"></td>
+                            <td>{{ search.name }}</td>
+                            <td>{{ search.query }}</td>
+                            <td></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center">No saved searches available</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Pagination -->
+            <nav aria-label="Page navigation">
+                <ul class="pagination">
+                    {% if advanced_searches.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{advanced_searches.previous_page_number}}&per_page={{ per_page }}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">&laquo;</span>
+                        </li>
+                    {% endif %}
+
+                    {% for num in advanced_searches.paginator.page_range %}
+                        <li class="page-item {% if advanced_searches.number == num %}active{% endif %}">
+                            <a class="page-link" href="?page={{ num }}&per_page={{ per_page }}">
+                                {{ num }}
+                            </a>
+                        </li>
+                    {% endfor %}
+
+                    {% if advanced_searches.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ advanced_searches.has_page_number }}&per_page={{ per_page }}" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">&raquo;</span>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+
+            <!-- Items per page dropdown -->
+            <div class="form-group mt-3">
+                <label for="per_page">Items per page:</label>
+                <select class="form-select" id="per_page" name="per_page" onchange="this.form.submit()">
+                    <option value="5" {% if per_page == 5 %}selected{% endif %}>5</option>
+                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                </select>
+            </div>
+
+            <!--  Submit form -->
+            <button type="submit" class="btn btn-primary mt-3">Push selected queries</button>
+        </form>
+    </div>
+{% endblock %}
