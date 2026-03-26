@@ -43,4 +43,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl --fail http://localhost:8000/ || exit 1
 
-CMD ["gunicorn", "--chdir", "pov_manager", "--bind", "0.0.0.0:8000", "pov_manager.wsgi:application", "--timeout", "90"]
+# AI exposure scans run synchronously in-request and can take several minutes (discovery + per-asset collection).
+CMD ["gunicorn", "--chdir", "pov_manager", "--bind", "0.0.0.0:8000", "pov_manager.wsgi:application", "--timeout", "600"]

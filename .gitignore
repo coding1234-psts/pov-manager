@@ -5,3 +5,8 @@ __pycache__/
 ctu-reports/*.zip
 # Local Mongo bootstrap (copy from init-mongo.js.example)
 mongo_db/init-mongo.js
+# NTFS alternate data streams (WSL / copied-from-Windows)
+*:Zone.Identifier
+.venv/
+pov_manager/.venv/
+ctu-reports/

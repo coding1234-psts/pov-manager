@@ -1,0 +1,1098 @@
+# ============================================================
+# AI Exposure & Attack Surface Analyzer
+# Detection Patterns, Endpoint Probes & Scoring Configuration
+# ============================================================
+# This file drives all detection logic and scoring.
+# Edit this file to add new patterns or adjust risk weights.
+# No Python changes required.
+# ============================================================
+
+
+# ------------------------------------------------------------
+# CREDENTIAL PATTERNS
+# Used by: secrets.py
+# Format:
+#   name: human-readable label
+#   regex: pattern to match
+#   confidence: high | medium | low
+#   description: shown in report
+# ------------------------------------------------------------
+
+credentials:
+
+  # --- AI Provider Keys ---
+
+  - name: OpenAI API Key
+    regex: 'sk-[a-zA-Z0-9]{48}'
+    confidence: high
+    description: >
+      An exposed OpenAI API key allows unauthorized use of OpenAI models
+      at the organization's expense and may expose conversation data.
+
+  - name: OpenAI Project Key
+    regex: 'sk-proj-[a-zA-Z0-9\-_]{80,}'
+    confidence: high
+    description: >
+      An exposed OpenAI project-scoped API key allows unauthorized access
+      to a specific OpenAI project and its associated resources.
+
+  - name: Anthropic API Key
+    regex: 'sk-ant-[a-zA-Z0-9\-_]{90,}'
+    confidence: high
+    description: >
+      An exposed Anthropic API key allows unauthorized use of Claude models
+      at the organization's expense.
+
+  - name: Hugging Face API Token
+    regex: 'hf_[a-zA-Z0-9]{34,}'
+    confidence: high
+    description: >
+      An exposed Hugging Face token may allow unauthorized access to private
+      models, datasets, or inference endpoints.
+
+  # --- Cloud Provider Keys ---
+
+  - name: AWS Access Key ID
+    regex: 'AKIA[0-9A-Z]{16}'
+    confidence: high
+    description: >
+      An exposed AWS Access Key ID, especially combined with a secret key,
+      provides broad access to cloud infrastructure and AI services like Bedrock.
+
+  - name: AWS Secret Access Key
+    regex: '(?i)aws.{0,20}secret.{0,20}["\s:=]+[A-Za-z0-9/+=]{40}'
+    confidence: high
+    description: >
+      An exposed AWS Secret Access Key paired with an Access Key ID grants
+      full programmatic access to AWS services.
+
+  - name: Azure Storage Key or Connection String
+    regex: '(?i)(AccountKey=|azure.{0,30}["\s:=]+)[A-Za-z0-9+/]{86}=='
+    confidence: high
+    description: >
+      An exposed Azure storage key or connection string allows unauthorized
+      access to Azure Blob Storage, which may contain model artifacts or data.
+
+  - name: Azure Client Secret
+    regex: '(?i)(client.?secret|clientsecret).{0,10}["\s:=]+[A-Za-z0-9\-_~.]{32,}'
+    confidence: medium
+    description: >
+      An exposed Azure client secret may allow unauthorized access to Azure
+      Active Directory applications and associated resources.
+
+  - name: GCP Service Account Key (JSON fragment)
+    regex: '"private_key":\s*"-----BEGIN RSA PRIVATE KEY-----'
+    confidence: high
+    description: >
+      An exposed GCP service account private key grants access to Google Cloud
+      services including Vertex AI and Cloud Storage.
+
+  - name: GCP API Key
+    regex: 'AIza[0-9A-Za-z\-_]{35}'
+    confidence: high
+    description: >
+      An exposed Google API key may grant access to Google Cloud services
+      including Vertex AI and other GCP APIs.
+
+  # --- Developer & Platform Tokens ---
+
+  - name: GitHub Personal Access Token (Classic)
+    regex: 'ghp_[A-Za-z0-9]{36}'
+    confidence: high
+    description: >
+      An exposed GitHub personal access token may allow access to private
+      repositories, including source code and additional secrets.
+
+  - name: GitHub OAuth Token
+    regex: 'gho_[A-Za-z0-9]{36}'
+    confidence: high
+    description: >
+      An exposed GitHub OAuth token may allow unauthorized access to
+      GitHub resources on behalf of a user.
+
+  - name: GitHub Actions Token
+    regex: 'ghs_[A-Za-z0-9]{36}'
+    confidence: high
+    description: >
+      An exposed GitHub Actions token may allow unauthorized access to
+      CI/CD pipelines and associated secrets.
+
+  - name: Slack Bot Token
+    regex: 'xoxb-[0-9]{10,12}-[0-9]{10,12}-[a-zA-Z0-9]{24}'
+    confidence: high
+    description: >
+      An exposed Slack bot token allows unauthorized access to Slack
+      workspaces, channels, and messages.
+
+  - name: Slack User Token
+    regex: 'xoxp-[0-9]{10,12}-[0-9]{10,12}-[0-9]{10,12}-[a-zA-Z0-9]{32}'
+    confidence: high
+    description: >
+      An exposed Slack user token allows impersonation of a real user
+      within a Slack workspace.
+
+  - name: Stripe Live Secret Key
+    regex: 'sk_live_[0-9a-zA-Z]{24,}'
+    confidence: high
+    description: >
+      An exposed Stripe live secret key allows unauthorized financial
+      transactions and access to customer payment data.
+
+  - name: Stripe Restricted Key
+    regex: 'rk_live_[0-9a-zA-Z]{24,}'
+    confidence: high
+    description: >
+      An exposed Stripe restricted key may allow access to specific
+      Stripe resources depending on configured permissions.
+
+  # --- Generic High-Entropy Detection ---
+  # These use contextual variable name matching + entropy heuristic in secrets.py
+  # The regex here matches the surrounding context; entropy is checked in code
+
+  - name: Generic Secret in Variable Assignment
+    regex: '(?i)(api_key|apikey|api_secret|secret_key|access_token|auth_token|private_key|bearer)\s*[=:]\s*["\x27]([A-Za-z0-9\-_./+=]{20,})["\x27]'
+    confidence: medium
+    description: >
+      A variable name strongly associated with credentials contains a
+      moderately high-entropy string. Manual verification recommended.
+
+  - name: Bearer Token in Source
+    regex: '(?i)bearer\s+[A-Za-z0-9\-_.+/=]{20,}'
+    confidence: medium
+    description: >
+      A hardcoded bearer token was found in a public asset. This may
+      allow unauthorized API access if the token is still valid.
+
+
+# ------------------------------------------------------------
+# AI SDK & SERVICE FINGERPRINTS
+# Used by: analyzer.py
+# Scanned in: HTML source, JS bundles, source maps
+# ------------------------------------------------------------
+
+ai_fingerprints:
+
+  - name: OpenAI SDK
+    # strong_patterns: at least one must match for the finding to be reported.
+    # These indicate actual SDK usage, not just a name reference in a UI bundle.
+    strong_patterns:
+      - 'require\s*\(\s*["'']openai["'']\s*\)'
+      - 'from\s+["'']openai["'']'
+      - 'new\s+OpenAI\s*\('
+      - 'openai\.chat\.completions'
+      - 'openai\.embeddings'
+      - 'openai\.images'
+      - 'api\.openai\.com'
+      - 'OPENAI_API_KEY\s*[=:]'
+    patterns:
+      - 'openai'
+      - 'from openai import'
+      - 'require.*openai'
+      - 'chat/completions'
+      - 'gpt-4'
+      - 'gpt-3\.5'
+    confidence: high
+    description: OpenAI SDK or API reference detected in public assets.
+
+  - name: Anthropic SDK
+    strong_patterns:
+      - 'require\s*\(\s*["'']@anthropic-ai[/"'']'
+      - 'from\s+["'']@anthropic-ai'
+      - 'new\s+Anthropic\s*\('
+      - 'anthropic\.messages\.create'
+      - 'anthropic\.completions'
+      - 'api\.anthropic\.com'
+      - 'ANTHROPIC_API_KEY\s*[=:]'
+    patterns:
+      - 'anthropic'
+      - 'from anthropic import'
+      - 'require.*anthropic'
+      - 'claude-3'
+      - 'claude-2'
+    confidence: high
+    description: Anthropic SDK or API reference detected in public assets.
+
+  - name: Azure OpenAI
+    strong_patterns:
+      - 'openai\.azure\.com'
+      - 'cognitiveservices\.azure\.com'
+      - 'new\s+AzureOpenAI\s*\('
+      - 'AzureOpenAI\s*\('
+      - 'AZURE_OPENAI_API_KEY\s*[=:]'
+    patterns:
+      - 'azure.*openai'
+      - 'openai.*azure'
+      - 'AzureOpenAI'
+    confidence: high
+    description: Azure OpenAI Service reference detected in public assets.
+
+  - name: AWS Bedrock
+    strong_patterns:
+      - 'bedrock-runtime'
+      - 'amazonaws\.com.*bedrock'
+      - 'bedrock\.invoke_model'
+      - 'bedrock\.converse'
+      - 'AWS_BEDROCK'
+    patterns:
+      - 'bedrock'
+      - 'boto3.*bedrock'
+      - 'aws.*bedrock'
+    confidence: high
+    description: AWS Bedrock reference detected in public assets.
+
+  - name: Google Vertex AI
+    strong_patterns:
+      - 'us-central1-aiplatform\.googleapis\.com'
+      - 'aiplatform\.googleapis\.com'
+      - 'new\s+VertexAI\s*\('
+      - 'from\s+["'']@google-cloud/vertexai'
+      - 'require\s*\(\s*["'']@google-cloud/vertexai'
+      - 'GOOGLE_VERTEX_AI'
+      - 'GEMINI_API_KEY\s*[=:]'
+    patterns:
+      - 'vertexai'
+      - 'vertex_ai'
+      - 'aiplatform'
+      - 'google.*generativeai'
+      - 'gemini-pro'
+      - 'gemini-1\.'
+    confidence: high
+    description: Google Vertex AI or Gemini API reference detected in public assets.
+
+  - name: Hugging Face
+    strong_patterns:
+      - 'api-inference\.huggingface\.co'
+      - 'huggingface\.co/api'
+      - 'from\s+["'']@huggingface'
+      - 'require\s*\(\s*["'']@huggingface'
+      - 'HuggingFaceInference\s*\('
+      - 'InferenceClient\s*\('
+      - 'HUGGING_FACE_API_KEY\s*[=:]'
+      - 'HF_TOKEN\s*[=:]'
+    patterns:
+      - 'huggingface'
+      - 'hugging.face'
+      - 'api-inference\.huggingface\.co'
+      - 'hf\.co'
+    confidence: high
+    description: Hugging Face API or SDK reference detected in public assets.
+
+  - name: LangChain
+    strong_patterns:
+      - 'require\s*\(\s*["'']langchain'
+      - 'from\s+["'']langchain[/"'']'
+      - 'from\s+["'']@langchain'
+      - 'require\s*\(\s*["'']@langchain'
+      - 'new\s+ChatOpenAI\s*\('
+      - 'new\s+ChatAnthropic\s*\('
+      - 'LLMChain\s*\('
+      - 'AgentExecutor\s*\('
+    patterns:
+      - 'langchain'
+      - 'from langchain'
+      - 'require.*langchain'
+      - 'LangChain'
+    confidence: high
+    description: LangChain framework reference detected. Often indicates complex LLM pipeline usage.
+
+  - name: LlamaIndex
+    strong_patterns:
+      - 'from\s+["'']llama.index'
+      - 'require\s*\(\s*["'']llama.index'
+      - 'GPTSimpleVectorIndex\s*\('
+      - 'VectorStoreIndex\s*\('
+      - 'SimpleDirectoryReader\s*\('
+    patterns:
+      - 'llama.index'
+      - 'llama_index'
+      - 'from llama_index'
+      - 'GPTSimpleVectorIndex'
+    confidence: high
+    description: LlamaIndex (formerly GPT Index) reference detected. Indicates RAG or document QA pipeline.
+
+  - name: Cohere
+    strong_patterns:
+      - 'api\.cohere\.ai'
+      - 'cohere\.Client\s*\('
+      - 'cohere\.generate'
+      - 'cohere\.embed'
+      - 'COHERE_API_KEY\s*[=:]'
+    patterns:
+      - 'cohere'
+      - 'api\.cohere\.ai'
+      - 'cohere\.Client'
+    confidence: medium
+    description: Cohere API reference detected in public assets.
+
+  - name: Mistral AI
+    strong_patterns:
+      - 'api\.mistral\.ai'
+      - 'new\s+MistralClient\s*\('
+      - 'mistralai\.Mistral\s*\('
+      - 'MISTRAL_API_KEY\s*[=:]'
+    patterns:
+      - 'mistral'
+      - 'api\.mistral\.ai'
+      - 'mistralai'
+    confidence: medium
+    description: Mistral AI API reference detected in public assets.
+
+  - name: Replicate
+    strong_patterns:
+      - 'api\.replicate\.com'
+      - 'replicate\.run\s*\('
+      - 'new\s+Replicate\s*\('
+      - 'REPLICATE_API_TOKEN\s*[=:]'
+    patterns:
+      - 'replicate'
+      - 'api\.replicate\.com'
+      - 'replicate\.run'
+    confidence: medium
+    description: Replicate API reference detected. May indicate hosted model usage.
+
+
+# ------------------------------------------------------------
+# CHATBOT & WIDGET FINGERPRINTS
+# Used by: analyzer.py
+# Scanned in: HTML source
+# ------------------------------------------------------------
+
+chatbot_fingerprints:
+
+  - name: Intercom (AI-enhanced)
+    patterns:
+      - 'intercomcdn\.com'
+      - 'widget\.intercom\.io'
+      - 'Intercom\('
+    description: Intercom widget detected. Intercom now includes AI-powered features by default.
+
+  - name: Drift
+    patterns:
+      - 'js\.driftt\.com'
+      - 'drift\.com/drift-frame'
+      - 'window\.drift'
+    description: Drift chatbot detected. Drift uses AI for conversation routing and responses.
+
+  - name: Tidio
+    patterns:
+      - 'code\.tidio\.co'
+      - 'tidio'
+    description: Tidio chat widget detected. Tidio includes LLM-powered AI response features.
+
+  - name: Crisp
+    patterns:
+      - 'client\.crisp\.chat'
+      - 'window\.\$crisp'
+    description: Crisp chat widget detected. Crisp includes AI assistant capabilities.
+
+  - name: Custom LLM Chat Widget (generic)
+    patterns:
+      - 'chat-widget'
+      - 'chatbot-widget'
+      - 'llm-chat'
+      - 'ai-chat'
+      - 'copilot-widget'
+    description: Custom or generic AI chat widget detected in page source.
+
+  - name: Vercel AI SDK (chat UI)
+    patterns:
+      - 'useChat'
+      - 'useCompletion'
+      - 'ai/react'
+      - '@vercel/ai'
+    description: Vercel AI SDK UI components detected, indicating an LLM-powered chat interface.
+
+# ------------------------------------------------------------
+# MCP & AGENT EXPOSURE FINGERPRINTS
+# Used by: analyzer.py
+# Scanned in: HTML source, JS bundles, sensitive files
+# ------------------------------------------------------------
+
+mcp_fingerprints:
+  - name: Model Context Protocol Reference
+    patterns:
+      - '\bmcp\b'
+      - 'model context protocol'
+      - 'mcp server'
+      - 'mcp client'
+      - 'mcp tools'
+      - 'mcp schema'
+      - 'mcp manifest'
+      - 'mcp transport'
+    confidence: medium
+    description: Public references to MCP-related infrastructure or capability were detected.
+
+  - name: MCP Tooling / Admin Surface
+    patterns:
+      - 'mcp/admin'
+      - 'mcp/debug'
+      - 'mcp/tools'
+      - 'listTools'
+      - 'callTool'
+      - 'tool schema'
+    confidence: high
+    description: Public references suggest exposed MCP tooling, admin, or debug capability.
+
+# ------------------------------------------------------------
+# PROMPT / INSTRUCTION LEAKAGE SIGNALS
+# Used by: analyzer.py
+# ------------------------------------------------------------
+
+prompt_leakage_patterns:
+  - name: System Prompt / Hidden Instructions
+    patterns:
+      - 'system prompt'
+      - 'you are a helpful assistant'
+      - 'follow these instructions'
+      - 'assistant instructions'
+      - 'do not reveal'
+      - 'ignore previous instructions'
+      - 'developer message'
+      - 'hidden prompt'
+      - 'internal prompt'
+      - 'guardrail'
+      - 'jailbreak'
+      - 'prompt template'
+    confidence: medium
+    description: Public assets appear to expose system prompts, instruction templates, or guardrail text.
+
+# ------------------------------------------------------------
+# VECTOR DB / EMBEDDING EXPOSURE FINGERPRINTS
+# Used by: analyzer.py
+# ------------------------------------------------------------
+
+vector_fingerprints:
+  - name: Pinecone Reference
+    patterns:
+      - 'pinecone'
+      - 'api.pinecone.io'
+      - 'PINECONE_API_KEY'
+    confidence: high
+    description: Public references to Pinecone vector infrastructure were detected.
+
+  - name: Weaviate Reference
+    patterns:
+      - 'weaviate'
+      - '/v1/graphql'
+      - '/v1/objects'
+      - 'weaviate.io'
+    confidence: high
+    description: Public references to Weaviate vector infrastructure were detected.
+
+  - name: Qdrant Reference
+    patterns:
+      - 'qdrant'
+      - '/collections/'
+      - 'qdrant.tech'
+    confidence: medium
+    description: Public references to Qdrant vector infrastructure were detected.
+
+  - name: Milvus / Zilliz Reference
+    patterns:
+      - 'milvus'
+      - 'zilliz'
+      - 'pymilvus'
+    confidence: medium
+    description: Public references to Milvus or Zilliz vector infrastructure were detected.
+
+  - name: Chroma Reference
+    patterns:
+      - 'chromadb'
+      - 'chroma client'
+      - 'collection.query'
+    confidence: medium
+    description: Public references to Chroma vector infrastructure were detected.
+
+embedding_patterns:
+  - name: Embedding / Retrieval Exposure
+    patterns:
+      - 'embedding'
+      - 'embeddings'
+      - 'semantic search'
+      - 'vector search'
+      - 'retrieval'
+      - 'nearest neighbors'
+      - 'query embedding'
+    confidence: medium
+    description: Public assets appear to expose embedding or retrieval-oriented capability.
+
+# ------------------------------------------------------------
+# AGENT FRAMEWORK FINGERPRINTS
+# Used by: analyzer.py
+# ------------------------------------------------------------
+
+agent_framework_fingerprints:
+  - name: LangChain
+    patterns:
+      - 'langchain'
+      - 'LLMChain'
+      - 'AgentExecutor'
+      - 'ChatOpenAI'
+      - 'ChatAnthropic'
+    confidence: high
+    description: Public assets reference the LangChain framework.
+
+  - name: LangGraph
+    patterns:
+      - 'langgraph'
+      - 'StateGraph'
+      - 'graph nodes'
+      - 'compiled graph'
+    confidence: high
+    description: Public assets reference the LangGraph orchestration framework.
+
+  - name: LlamaIndex
+    patterns:
+      - 'llama_index'
+      - 'llama.index'
+      - 'VectorStoreIndex'
+      - 'SimpleDirectoryReader'
+    confidence: high
+    description: Public assets reference the LlamaIndex framework.
+
+  - name: CrewAI
+    patterns:
+      - 'crewai'
+      - 'Crew('
+      - 'Agent('
+      - 'Task('
+    confidence: medium
+    description: Public assets reference the CrewAI agent framework.
+
+  - name: AutoGen
+    patterns:
+      - 'autogen'
+      - 'AssistantAgent'
+      - 'UserProxyAgent'
+      - 'GroupChat'
+    confidence: medium
+    description: Public assets reference the AutoGen agent framework.
+
+  - name: Semantic Kernel
+    patterns:
+      - 'semantic kernel'
+      - 'semantic-kernel'
+      - 'KernelFunction'
+      - 'KernelPlugin'
+    confidence: medium
+    description: Public assets reference Microsoft Semantic Kernel.
+
+# ------------------------------------------------------------
+# AI PLUGIN / MANIFEST / TRACE EXPOSURE
+# Used by: analyzer.py
+# ------------------------------------------------------------
+
+plugin_manifest_patterns:
+  - name: AI Plugin / Assistant Manifest Exposure
+    patterns:
+      - 'ai-plugin.json'
+      - '.well-known/ai-plugin.json'
+      - 'schema_version'
+      - 'api.url'
+      - 'logo_url'
+      - 'contact_email'
+      - 'legal_info_url'
+      - 'assistant.json'
+      - 'agent.json'
+    confidence: medium
+    description: Public assets appear to expose AI plugin or assistant manifest content.
+
+trace_log_patterns:
+  - name: AI Trace / Eval / Log Exposure
+    patterns:
+      - 'prompt logs'
+      - 'evaluation trace'
+      - 'chat transcript'
+      - 'conversation history'
+      - 'system prompt log'
+      - 'trace id'
+      - 'langsmith'
+      - 'promptfoo'
+      - 'eval results'
+      - 'llm trace'
+    confidence: medium
+    description: Public assets appear to expose AI traces, evaluations, transcripts, or prompt logging artifacts.
+
+# ------------------------------------------------------------
+# INFERENCE GATEWAY / MODEL API EXPOSURE
+# Used by: analyzer.py
+# ------------------------------------------------------------
+
+inference_fingerprints:
+  - name: OpenAI-Compatible Model API Exposure
+    patterns:
+      - '/v1/models'
+      - '/v1/chat/completions'
+      - '/v1/completions'
+      - '/v1/embeddings'
+      - 'chat.completion'
+      - 'object":"model"'
+      - 'choices'
+      - 'usage'
+    confidence: high
+    description: Public assets or responses appear to expose an OpenAI-compatible model API.
+
+  - name: vLLM / Inference Server Reference
+    patterns:
+      - 'vllm'
+      - 'openai-compatible server'
+      - 'served-model-name'
+      - 'vllm serve'
+    confidence: medium
+    description: Public assets appear to reference a vLLM-backed inference deployment.
+
+  - name: Ollama / Local Model Gateway Reference
+    patterns:
+      - 'ollama'
+      - '/api/generate'
+      - '/api/chat'
+      - '/api/tags'
+      - '11434'
+    confidence: medium
+    description: Public assets appear to reference an Ollama-style inference surface.
+
+  - name: Hugging Face TGI / Text Generation Endpoint
+    patterns:
+      - 'text-generation-inference'
+      - '/generate_stream'
+      - '/generate'
+      - 'huggingface tgi'
+    confidence: medium
+    description: Public assets appear to reference a hosted text-generation inference service.
+
+# ------------------------------------------------------------
+# AI ADMIN / PLAYGROUND / DEBUG EXPOSURE
+# Used by: analyzer.py
+# ------------------------------------------------------------
+
+admin_playground_patterns:
+  - name: AI Playground / Debug Surface Exposure
+    patterns:
+      - 'playground'
+      - 'prompt playground'
+      - 'chat playground'
+      - 'model playground'
+      - 'debug console'
+      - 'eval dashboard'
+      - 'prompt console'
+      - 'admin chat'
+      - 'model explorer'
+      - 'inference dashboard'
+    confidence: medium
+    description: Public assets appear to expose AI playground, debug, or admin-like surfaces.
+
+
+# ------------------------------------------------------------
+# AI ENDPOINT PROBE PATHS
+# Used by: collector.py
+# These paths are probed with GET requests only.
+# No authentication bypass. No exploit payloads.
+# ------------------------------------------------------------
+
+ai_endpoint_paths:
+  - /ai
+  - /chat
+  - /chatbot
+  - /completion
+  - /completions
+  - /generate
+  - /inference
+  - /predict
+  - /query
+  - /ask
+  - /assistant
+  - /copilot
+  - /api/ai
+  - /api/chat
+  - /api/completion
+  - /api/completions
+  - /api/generate
+  - /api/inference
+  - /api/predict
+  - /api/assistant
+  - /api/v1/chat
+  - /api/v1/completions
+  - /v1/chat
+  - /v1/chat/completions
+  - /v1/completions
+  - /v1/generate
+  - /v1/inference
+  - /v1/models
+  - /v1/embeddings
+  - /mcp
+  - /mcp/
+  - /mcp/health
+  - /mcp/tools
+  - /mcp/schema
+  - /mcp/manifest
+  - /mcp/admin
+  - /mcp/debug
+  - /api/mcp
+  - /api/mcp/tools
+  - /api/mcp/schema
+  - /embeddings
+  - /api/embeddings
+  - /vector
+  - /vectors
+  - /api/vector
+  - /api/vectors
+  - /search
+  - /semantic-search
+  - /retrieval
+  - /retrieve
+
+
+# ------------------------------------------------------------
+# PUBLIC CONFIG & SENSITIVE FILE PATHS
+# Used by: collector.py
+# Probed with GET. Existence flagged, content scanned.
+# ------------------------------------------------------------
+
+sensitive_paths:
+  - /.env
+  - /.env.example
+  - /.env.local
+  - /.env.production
+  - /config.js
+  - /config.json
+  - /settings.json
+  - /app.config.js
+  - /openapi.json
+  - /openapi.yaml
+  - /swagger.json
+  - /swagger.yaml
+  - /api-docs
+  - /api-docs.json
+  - /api/swagger
+  - /api/openapi
+  - /docs
+  - /redoc
+  - /.well-known/ai-plugin.json
+  - /ai-plugin.json
+  - /robots.txt
+  - /sitemap.xml
+  - /.well-known/mcp.json
+  - /.well-known/agent.json
+  - /.well-known/assistant.json
+  - /prompts.json
+  - /prompt.txt
+  - /system-prompt.txt
+  - /assistant-prompt.txt
+  - /agent-config.json
+
+
+# ------------------------------------------------------------
+# VULNERABILITY SIGNAL PATTERNS
+# Used by: analyzer.py
+# Detects risky deployment patterns (non-exploitative)
+# ------------------------------------------------------------
+
+vulnerability_signals:
+
+  missing_auth_indicators:
+    description: >
+      AI endpoints that respond with 200 OK and no WWW-Authenticate header,
+      no redirect to login, and no API key requirement in response body.
+    response_codes_of_concern: [200]
+    absence_of_headers:
+      - 'WWW-Authenticate'
+      - 'X-API-Key'
+    absence_of_body_patterns:
+      - 'unauthorized'
+      - 'authentication required'
+      - 'api key required'
+      - 'please login'
+
+  missing_rate_limit_headers:
+    description: >
+      AI endpoints with no rate limiting signals are vulnerable to abuse
+      and cost exhaustion attacks.
+    absence_of_headers:
+      - 'X-RateLimit-Limit'
+      - 'X-RateLimit-Remaining'
+      - 'Retry-After'
+      - 'X-Rate-Limit'
+
+  open_api_docs:
+    description: >
+      Publicly accessible API documentation may expose internal AI route
+      structures, model names, and parameter schemas to attackers.
+    response_body_patterns:
+      - 'swagger-ui'
+      - 'openapi'
+      - 'redoc'
+      - '"paths":'
+      - '"info":'
+      - '"components":'
+
+  exposed_source_maps:
+    description: >
+      JavaScript source maps expose original unminified source code,
+      which may contain API keys, internal logic, or endpoint structures.
+    file_extensions:
+      - '.js.map'
+      - '.ts.map'
+    header_pattern: 'X-SourceMap'
+    inline_pattern: '//# sourceMappingURL='
+
+  missing_csrf:
+    description: >
+      Forms that post to AI endpoints without CSRF tokens are vulnerable
+      to cross-site request forgery attacks.
+    absence_of_input_patterns:
+      - 'csrf'
+      - '_token'
+      - 'xsrf'
+
+  open_storage_buckets:
+    description: >
+      Publicly accessible cloud storage may contain model artifacts,
+      training data, or other sensitive AI assets.
+    url_patterns:
+      - '\.s3\.amazonaws\.com'
+      - '\.s3\.[a-z0-9\-]+\.amazonaws\.com'
+      - 'storage\.googleapis\.com'
+      - '\.blob\.core\.windows\.net'
+      - 'r2\.cloudflarestorage\.com'
+
+
+# ------------------------------------------------------------
+# SCORING WEIGHTS
+# Used by: scorer.py
+# Adjust values here to tune risk thresholds.
+# ------------------------------------------------------------
+
+scoring:
+
+  weights:
+    exposed_ai_key_high: 50
+    exposed_cloud_key_high: 40
+    exposed_key_medium: 25
+    exposed_key_low: 10
+    public_ai_endpoint_no_auth: 60
+    open_api_docs_ai_routes: 30
+    open_storage_bucket: 45
+    source_map_exposed: 20
+    ai_sdk_in_public_bundle: 10
+    chatbot_detected_no_validation: 15
+    no_rate_limiting_on_ai_endpoint: 10
+    missing_csrf_on_ai_form: 10
+    mcp_exposed: 25
+    prompt_leakage: 20
+    vector_exposed: 20
+    embedding_exposed: 15
+    agent_framework_exposed: 20
+    plugin_manifest_exposed: 15
+    trace_log_exposed: 20
+    inference_api_exposed: 25
+    admin_playground_exposed: 20
+
+  thresholds:
+    low:
+      min: 0
+      max: 25
+      label: Low
+      color: green
+      hex: '#2d7a2d'
+      summary_template: >
+        {target} shows limited AI-related public exposure at this time.
+        {finding_count} signals were identified, none of which represent
+        immediate critical risk. Continued monitoring is recommended as
+        AI adoption expands.
+
+    moderate:
+      min: 26
+      max: 75
+      label: Moderate
+      color: amber
+      hex: '#b35c00'
+      summary_template: >
+        {target} presents a moderate AI attack surface with a risk score
+        of {score}. {finding_count} findings were identified including
+        {top_findings}. These exposures represent meaningful risk that
+        should be addressed before they can be exploited by a threat actor.
+
+    high:
+      min: 76
+      max: 9999
+      label: High
+      color: red
+      hex: '#b30000'
+      summary_template: >
+        {target} presents a high AI attack surface risk with a score of
+        {score}. {finding_count} findings were identified including
+        {top_findings}. Immediate remediation is recommended. These
+        exposures create material risk of unauthorized AI access, data
+        exfiltration, and significant financial liability.
+
+
+# ------------------------------------------------------------
+# REMEDIATION GUIDANCE
+# Used by: reporter.py
+# Keyed to finding types. Shown in report remediation section.
+# ------------------------------------------------------------
+
+remediation:
+
+  exposed_ai_key:
+    title: Rotate Exposed AI API Keys Immediately
+    priority: Critical
+    steps:
+      - Rotate the exposed key immediately via the provider's dashboard (OpenAI, Anthropic, etc.)
+      - Audit usage logs for the exposed key to identify any unauthorized usage
+      - Remove the key from all public-facing assets (JS bundles, HTML, config files)
+      - Store API keys in environment variables or a secrets manager (e.g. AWS Secrets Manager, HashiCorp Vault)
+      - Add pre-commit hooks or CI checks to prevent secrets from being committed
+
+  exposed_cloud_key:
+    title: Rotate Exposed Cloud Credentials and Audit Access
+    priority: Critical
+    steps:
+      - Immediately rotate or revoke the exposed cloud key via the provider console
+      - Review CloudTrail / audit logs for unauthorized API calls using the exposed key
+      - Apply least-privilege IAM policies to all service accounts
+      - Enforce secrets management policies across all development teams
+      - Consider enabling AWS GuardDuty or equivalent anomaly detection
+
+  public_ai_endpoint_no_auth:
+    title: Restrict Access to AI Endpoints
+    priority: High
+    steps:
+      - Require API key or OAuth token authentication on all AI endpoints
+      - Return 401 Unauthorized for unauthenticated requests
+      - Consider IP allowlisting for internal-only AI endpoints
+      - Implement rate limiting to prevent abuse and cost exhaustion
+
+  open_api_docs:
+    title: Restrict Access to API Documentation
+    priority: Medium
+    steps:
+      - Move Swagger/OpenAPI documentation behind authentication
+      - Consider disabling API docs entirely in production environments
+      - Ensure API docs do not expose internal model names or infrastructure details
+
+  source_map_exposed:
+    title: Disable Source Map Exposure in Production
+    priority: Medium
+    steps:
+      - Configure your build tool to exclude source maps from production builds
+      - If source maps are needed for error tracking, use a private source map service
+      - Audit existing deployed assets and remove any accessible .map files
+
+  open_storage_bucket:
+    title: Restrict Public Access to Cloud Storage
+    priority: High
+    steps:
+      - Set storage bucket/blob access policy to private
+      - Enable Block Public Access settings on all S3 buckets
+      - Audit bucket contents for sensitive model artifacts or training data
+      - Use signed URLs for any assets that require temporary public access
+
+  missing_rate_limiting:
+    title: Implement Rate Limiting on AI Endpoints
+    priority: Medium
+    steps:
+      - Implement rate limiting at the API gateway or application layer
+      - Set appropriate limits per IP and per API key
+      - Return 429 Too Many Requests with Retry-After header when limits are exceeded
+      - Monitor for unusual usage spikes that may indicate abuse
+
+  chatbot_no_validation:
+    title: Add Input Validation to AI-Powered Forms and Chatbots
+    priority: Medium
+    steps:
+      - Implement server-side input validation and sanitization
+      - Add CSRF protection to all forms that submit to AI endpoints
+      - Consider implementing a system prompt that resists prompt injection
+      - Add output filtering to prevent sensitive data leakage in AI responses
+
+  mcp_exposed:
+    title: Restrict Public MCP Exposure
+    priority: High
+    steps:
+      - Ensure MCP endpoints, manifests, and tool schemas are not publicly exposed without authentication
+      - Remove or protect admin and debug routes related to MCP servers
+      - Avoid exposing tool capability lists to unauthenticated internet users
+      - Review whether MCP should be reachable externally at all
+
+  prompt_leakage:
+    title: Remove Prompt and Instruction Leakage from Public Assets
+    priority: High
+    steps:
+      - Remove system prompts, instruction templates, and guardrail text from public JS bundles and config files
+      - Avoid embedding assistant prompts in client-side code where possible
+      - Disable source maps in production if they expose internal prompt logic
+      - Audit prompt templates and agent configuration artifacts for accidental publication
+
+  vector_exposed:
+    title: Restrict Public Vector Database Exposure
+    priority: High
+    steps:
+      - Ensure vector database APIs, admin surfaces, and collection metadata are not publicly exposed
+      - Restrict access to vector infrastructure by network and authentication controls
+      - Review OpenAPI/docs exposure for retrieval and vector management routes
+      - Audit public bundles for leaked vector service configuration and credentials
+
+  embedding_exposed:
+    title: Restrict Public Embedding and Retrieval Endpoints
+    priority: Medium
+    steps:
+      - Require authentication and rate limiting on embedding or retrieval endpoints
+      - Avoid exposing semantic-search or retrieval APIs publicly unless intentionally designed for that use
+      - Review whether embedding endpoints leak model or architecture information to unauthenticated users
+
+  agent_framework_exposed:
+    title: Review Public Agent Framework Exposure
+    priority: Medium
+    steps:
+      - Ensure public bundles and config files do not unnecessarily reveal agent orchestration frameworks
+      - Review whether public references expose architectural details useful to attackers
+      - Minimize leakage of agent workflow primitives, tool wiring, and orchestration patterns in client-side assets
+
+  plugin_manifest_exposed:
+    title: Restrict Public AI Plugin and Manifest Exposure
+    priority: Medium
+    steps:
+      - Review whether public plugin or assistant manifests are intentionally exposed
+      - Minimize capability details exposed through manifests where possible
+      - Ensure associated API surfaces are authenticated and rate-limited
+
+  trace_log_exposed:
+    title: Remove Public AI Trace, Eval, and Transcript Exposure
+    priority: High
+    steps:
+      - Remove prompt logs, traces, eval artifacts, and transcript data from public-facing assets
+      - Restrict access to observability and evaluation tooling
+      - Audit static assets and docs for leaked conversation or prompt content
+
+  inference_api_exposed:
+    title: Restrict Public Inference and Model API Exposure
+    priority: High
+    steps:
+      - Require authentication on model-serving and inference APIs
+      - Restrict public access to `/v1/models`, chat/completions, embeddings, and similar model routes
+      - Add rate limiting and abuse controls to externally reachable inference surfaces
+      - Review whether public model metadata or playground-style interfaces are unintentionally exposed
+
+  admin_playground_exposed:
+    title: Restrict Public AI Playground and Debug Surfaces
+    priority: High
+    steps:
+      - Remove or authenticate AI playgrounds, prompt consoles, debug panels, and model explorers
+      - Avoid exposing internal testing or demo surfaces to the public internet
+      - Review whether public AI admin or evaluation interfaces leak architectural or operational details
+
+
+# ------------------------------------------------------------
+# SCANNER BEHAVIOUR SETTINGS
+# Used by: collector.py, cli.py
+# ------------------------------------------------------------
+
+scanner:
+  request_timeout_seconds: 10
+  delay_between_requests_seconds: 0.5
+  max_js_bundle_size_mb: 10
+  max_redirects: 3
+  user_agent: 'AIExposureAnalyzer/1.0 (Security Assessment Scanner; non-invasive)'
+  respect_robots_txt: true
+  follow_cross_domain_redirects: false

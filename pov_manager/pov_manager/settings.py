@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 
+import os
+
 import environ
 from pathlib import Path
 
@@ -41,6 +43,10 @@ env = environ.Env(
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load .env from repo root (parent of this Django project) and/or next to manage.py
+for _env_path in (BASE_DIR.parent / '.env', BASE_DIR / '.env'):
+    if _env_path.is_file():
+        environ.Env.read_env(_env_path)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
@@ -77,7 +83,7 @@ INSTALLED_APPS = [
     'xdr',
 ]
 
-SIDE_ID = 1
+SITE_ID = 1
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -188,7 +194,16 @@ XDR_DEFAULT_REGION = env('XDR_DEFAULT_REGION')
 VDR_ACCESS_TOKEN = env('VDR_ACCESS_TOKEN')
 VDR_TEAM_ID = env('VDR_TEAM_ID')
 CTU_ACCESS_TOKEN = env('CTU_ACCESS_TOKEN')
-CTU_REPORTS_PATH = env('CTU_REPORTS_PATH')
+# Docker Compose mounts ./ctu-reports at /ctu-reports. Running manage.py on the host
+# often has no writable /ctu-reports — fall back to the same repo directory the mount uses.
+_ctu_reports_env = env('CTU_REPORTS_PATH')
+_ctu_reports_path = Path(_ctu_reports_env)
+if _ctu_reports_env == '/ctu-reports' and (
+    not _ctu_reports_path.is_dir() or not os.access(_ctu_reports_path, os.W_OK)
+):
+    CTU_REPORTS_PATH = str((BASE_DIR.parent / 'ctu-reports').resolve())
+else:
+    CTU_REPORTS_PATH = _ctu_reports_env
 CTU_BASE_URL = env('CTU_BASE_URL')
 
 CACHE_TENANTS_DATA_COLLECTION_NAME = env('CACHE_TENANTS_DATA_COLLECTION_NAME')

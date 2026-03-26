@@ -51,6 +51,19 @@ class ThreatProfile(models.Model):
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default=STATUS_CREATED, null=False, blank=False)
     ctu_autobrief_data = models.JSONField(default=dict, null=True, blank=True)
     ctu_autobrief_report_id = models.CharField(max_length=50, null=True, blank=True)
+    ai_exposure_scan_time = models.DateTimeField(null=True, blank=True)
+    ai_exposure_report_html = models.CharField(
+        max_length=255, null=True, blank=True,
+        help_text='Basename of HTML report under CTU_REPORTS_PATH',
+    )
+    ai_exposure_findings_json = models.CharField(
+        max_length=255, null=True, blank=True,
+        help_text='Basename of full findings JSON under CTU_REPORTS_PATH',
+    )
+    ai_exposure_powerpoint_json = models.CharField(
+        max_length=255, null=True, blank=True,
+        help_text='Basename of compact PowerPoint-oriented JSON under CTU_REPORTS_PATH',
+    )
     vivun_activity = models.CharField(max_length=6, null=False, blank=False, default='000000')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
 

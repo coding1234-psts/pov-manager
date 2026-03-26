@@ -2,6 +2,14 @@
 {% load static %}
 {% block content %}
     <div class="container-fluid mt-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
         <h1>Threat Profile Manager</h1>
         <div class="row">
             <div class="col-md-6 mt-3">
@@ -115,6 +123,20 @@
                                 <td class="align-middle text-center">{{ profile.get_status_display }}</td>
                                 <td>{{ profile.modified_data|date:"M d, Y" }}</td>
                                 <td class="align-middle text-center">
+                                    {% if profile.organization_domain %}
+                                        <div class="mb-2">
+                                            <a href="{% url 'run_ai_exposure_scan' threat_profile_unique_id=profile.unique_id %}" class="btn btn-outline-secondary btn-sm mx-1 my-1" onclick="return confirm('Run AI exposure scan for {{ profile.organization_domain }}? This may take several minutes.')">AI exposure scan</a>
+                                        </div>
+                                        {% if profile.ai_exposure_report_html %}
+                                            <a href="{% url 'download_ai_exposure_report' file_basename=profile.ai_exposure_report_html %}" class="btn btn-link btn-sm p-0 d-block">AI HTML report</a>
+                                        {% endif %}
+                                        {% if profile.ai_exposure_powerpoint_json %}
+                                            <a href="{% url 'download_ai_exposure_report' file_basename=profile.ai_exposure_powerpoint_json %}" class="btn btn-link btn-sm p-0 d-block">AI summary (PPT) JSON</a>
+                                        {% endif %}
+                                        {% if profile.ai_exposure_findings_json %}
+                                            <a href="{% url 'download_ai_exposure_report' file_basename=profile.ai_exposure_findings_json %}" class="btn btn-link btn-sm p-0 d-block">AI full findings JSON</a>
+                                        {% endif %}
+                                    {% endif %}
                                     {% if profile.status == 'CREATED' %}
                                         <button type="button" class="btn btn-warning btn-sm mx-1 my-1" onclick="fillEditForm(this, '{% url 'update_threat_profile' threat_profile_unique_id=profile.unique_id %}', '{{ profile.unique_id }}')">Edit</button><br/>
 
