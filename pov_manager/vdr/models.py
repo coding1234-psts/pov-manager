@@ -31,6 +31,25 @@ class ThreatProfile(models.Model):
         (STATUS_CTU_AUTOBRIEF_REPORT_AVAILABLE_WITHOUT_VDR, 'CTU Autobrief report available without VDR')
     )
 
+    AI_EXPOSURE_JOB_QUEUED = 'queued'
+    AI_EXPOSURE_JOB_RUNNING = 'running'
+    AI_EXPOSURE_JOB_READY = 'ready'
+    AI_EXPOSURE_JOB_FAILED = 'failed'
+    AI_EXPOSURE_JOB_SKIPPED = 'skipped'
+    AI_EXPOSURE_JOB_CHOICES = (
+        ('', 'Not set (legacy)'),
+        (AI_EXPOSURE_JOB_QUEUED, 'Queued'),
+        (AI_EXPOSURE_JOB_RUNNING, 'Running'),
+        (AI_EXPOSURE_JOB_READY, 'Ready'),
+        (AI_EXPOSURE_JOB_FAILED, 'Failed'),
+        (AI_EXPOSURE_JOB_SKIPPED, 'Skipped (no domain)'),
+    )
+    AI_EXPOSURE_JOB_TERMINAL = frozenset({
+        AI_EXPOSURE_JOB_READY,
+        AI_EXPOSURE_JOB_FAILED,
+        AI_EXPOSURE_JOB_SKIPPED,
+    })
+
     unique_id = models.UUIDField(default=uuid4, editable=False, unique=True)
     organization_name = models.CharField(max_length=200, null=False, blank=False)
     organization_email_domains = ArrayField(base_field=models.CharField(max_length=200, null=True, blank=True),
@@ -64,6 +83,14 @@ class ThreatProfile(models.Model):
         max_length=255, null=True, blank=True,
         help_text='Basename of compact PowerPoint-oriented JSON under CTU_REPORTS_PATH',
     )
+    ai_exposure_job_status = models.CharField(
+        max_length=20,
+        choices=AI_EXPOSURE_JOB_CHOICES,
+        default='',
+        blank=True,
+        help_text='Background AI exposure job state for CTU autobrief alignment',
+    )
+    ai_exposure_job_error = models.TextField(null=True, blank=True)
     vivun_activity = models.CharField(max_length=6, null=False, blank=False, default='000000')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
 

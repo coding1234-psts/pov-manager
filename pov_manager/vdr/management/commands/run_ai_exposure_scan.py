@@ -1,10 +1,8 @@
-import os
-
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from django.utils import timezone
 
 from ai_exposure.engine import run_ai_exposure_scan
+from vdr.ai_exposure_workflow import persist_ai_exposure_scan_outcome
 from vdr.models import ThreatProfile
 
 
@@ -52,14 +50,9 @@ class Command(BaseCommand):
             settings.CTU_REPORTS_PATH,
             file_prefix=prefix,
         )
+        self.stdout.write(self.style.SUCCESS(f"Done: {result.get('paths')}"))
+        if uuid:
+            p = ThreatProfile.objects.get(unique_id=uuid)
+            persist_ai_exposure_scan_outcome(p, result)
         if result.get("error"):
             raise CommandError(result["error"])
-        self.stdout.write(self.style.SUCCESS(f"Done: {result.get('paths')}"))
-        if uuid and result.get("paths"):
-            p = ThreatProfile.objects.get(unique_id=uuid)
-            paths = result["paths"]
-            p.ai_exposure_report_html = os.path.basename(paths["html"])
-            p.ai_exposure_findings_json = os.path.basename(paths["findings_json"])
-            p.ai_exposure_powerpoint_json = os.path.basename(paths["powerpoint_json"])
-            p.ai_exposure_scan_time = timezone.now()
-            p.save()

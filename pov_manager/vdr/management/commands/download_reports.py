@@ -21,6 +21,7 @@ from django.db.models import (
 from django.db.models.functions import Concat
 from django.utils import timezone
 
+from vdr.ai_exposure_workflow import schedule_ai_exposure_for_new_autobrief
 from vdr.ctuapi import submit_new_report as ctu_submit_new_report
 from vdr.models import ThreatProfile, Vulnerabilities
 from vdr.vdrapi import (
@@ -366,8 +367,11 @@ def process_profile(profile: ThreatProfile) -> None:
     profile.save()
 
     # Generate and submit CTU autobrief report
+    had_previous_ctu = bool((profile.ctu_autobrief_report_id or "").strip())
     profile.ctu_autobrief_report_id = generate_ctu_autobrief_report(profile, has_vdr_data=has_vdr_data)
     profile.status = ThreatProfile.STATUS_CTU_AUTOBRIEF_REPORT_REQUESTED
+    if profile.ctu_autobrief_report_id and not had_previous_ctu:
+        schedule_ai_exposure_for_new_autobrief(profile)
     profile.save()
 
     logger.info(f'Completed processing for {profile.organization_name}')

@@ -421,6 +421,7 @@ class TestProcessProfile(TestCase):
         profile.refresh_from_db()
         assert profile.status == ThreatProfile.STATUS_CTU_AUTOBRIEF_REPORT_REQUESTED
         assert profile.ctu_autobrief_report_id == 'report_789'
+        assert profile.ai_exposure_job_status == ThreatProfile.AI_EXPOSURE_JOB_QUEUED
 
     @mock.patch('vdr.management.commands.download_reports.generate_ctu_autobrief_report')
     @mock.patch('vdr.management.commands.download_reports.build_vdr_data')
@@ -438,6 +439,7 @@ class TestProcessProfile(TestCase):
         profile.refresh_from_db()
         # Should still complete but without VDR data
         assert profile.status == ThreatProfile.STATUS_CTU_AUTOBRIEF_REPORT_REQUESTED
+        assert profile.ai_exposure_job_status == ThreatProfile.AI_EXPOSURE_JOB_QUEUED
 
 
 @pytest.mark.django_db

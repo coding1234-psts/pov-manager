@@ -11,7 +11,6 @@ from .views import (
     export_threat_profiles_csv,
     cleanup_vdr_profile,
     get_se_emails_list,
-    run_ai_exposure_scan_for_profile,
     download_ai_exposure_artifact,
 )
 
@@ -37,11 +36,6 @@ urlpatterns = [
         download_ctu_autobrief_zip_file,
         name='ctu_autobrief_zip_file'),
 
-    path(
-        'threat-profile/<uuid:threat_profile_unique_id>/ai-exposure-scan/',
-        run_ai_exposure_scan_for_profile,
-        name='run_ai_exposure_scan',
-    ),
     path(
         'threat-profile/ai-exposure-download/<str:file_basename>',
         download_ai_exposure_artifact,

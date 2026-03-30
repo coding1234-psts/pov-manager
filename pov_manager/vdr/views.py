@@ -40,8 +40,7 @@ from vdr.vdrapi import (
     VDRAPIError
 )
 from vdr.utils import generate_vulnerabilities_excel, validate_ip_range
-
-from ai_exposure.engine import run_ai_exposure_scan
+from vdr.ai_exposure_workflow import schedule_ai_exposure_for_new_autobrief
 
 
 logger = logging.getLogger(__name__)
@@ -283,76 +282,6 @@ def start_vdr_scans(request: HttpRequest, threat_profile_unique_id: str) -> Http
 
 
 @login_required
-def run_ai_exposure_scan_for_profile(
-    request: HttpRequest, threat_profile_unique_id: str
-) -> HttpResponse:
-    """Run internal AI exposure analyzer using ThreatProfile.organization_domain."""
-    profile = get_object_or_404(ThreatProfile, unique_id=threat_profile_unique_id)
-    domain = (profile.organization_domain or "").strip()
-    if not domain:
-        messages.error(request, "This threat profile has no primary organization domain.")
-        return redirect(reverse("threat_profile") + "?created_by=on")
-
-    try:
-        result = run_ai_exposure_scan(
-            domain,
-            settings.CTU_REPORTS_PATH,
-            file_prefix=str(profile.unique_id),
-        )
-    except Exception:
-        logger.exception(
-            "AI exposure scan raised for profile %s domain %s",
-            profile.unique_id,
-            domain,
-        )
-        messages.error(
-            request,
-            "AI exposure scan failed with an unexpected error. "
-            "Check server logs for details, or run: "
-            "python manage.py run_ai_exposure_scan --profile-uuid "
-            f"{profile.unique_id}",
-        )
-        return redirect(reverse("threat_profile") + "?created_by=on")
-
-    if result.get("error"):
-        messages.error(request, f"AI exposure scan failed: {result['error']}")
-    elif result.get("paths"):
-        paths = result["paths"]
-        try:
-            profile.ai_exposure_report_html = os.path.basename(paths["html"])
-            profile.ai_exposure_findings_json = os.path.basename(paths["findings_json"])
-            profile.ai_exposure_powerpoint_json = os.path.basename(paths["powerpoint_json"])
-            profile.ai_exposure_scan_time = timezone.now()
-            profile.save(
-                update_fields=[
-                    "ai_exposure_report_html",
-                    "ai_exposure_findings_json",
-                    "ai_exposure_powerpoint_json",
-                    "ai_exposure_scan_time",
-                    "modified_data",
-                ]
-            )
-        except Exception:
-            logger.exception(
-                "Saving AI exposure artifact paths failed for profile %s",
-                profile.unique_id,
-            )
-            messages.error(
-                request,
-                "Scan produced files but saving the profile failed. "
-                "Check CTU_REPORTS_PATH permissions and database connectivity.",
-            )
-        else:
-            messages.success(
-                request,
-                "AI exposure scan finished. HTML report and JSON outputs saved next to CTU reports.",
-            )
-    else:
-        messages.warning(request, "AI exposure scan completed with no output paths.")
-    return redirect(reverse("threat_profile") + "?created_by=on")
-
-
-@login_required
 def download_ai_exposure_artifact(
     request: HttpRequest, file_basename: str
 ) -> FileResponse | HttpResponseNotFound:
@@ -460,8 +389,12 @@ def force_generate_ctu_autobrief_report(request, threat_profile_unique_id):
         'template_pptx': 'Threat_Profile_DMARC_Template.pptx',
     }
 
-    profile.ctu_autobrief_report_id = ctu_submit_new_report(data)
+    had_previous_ctu = bool((profile.ctu_autobrief_report_id or "").strip())
+    new_report_id = ctu_submit_new_report(data)
+    profile.ctu_autobrief_report_id = new_report_id
     profile.status = ThreatProfile.STATUS_CTU_AUTOBRIEF_REPORT_REQUESTED_WITHOUT_VDR
+    if new_report_id and not had_previous_ctu:
+        schedule_ai_exposure_for_new_autobrief(profile)
     profile.save()
 
     return redirect(reverse('threat_profile') + '?created_by=on')

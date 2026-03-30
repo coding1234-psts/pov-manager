@@ -123,10 +123,7 @@
                                 <td class="align-middle text-center">{{ profile.get_status_display }}</td>
                                 <td>{{ profile.modified_data|date:"M d, Y" }}</td>
                                 <td class="align-middle text-center">
-                                    {% if profile.organization_domain %}
-                                        <div class="mb-2">
-                                            <a href="{% url 'run_ai_exposure_scan' threat_profile_unique_id=profile.unique_id %}" class="btn btn-outline-secondary btn-sm mx-1 my-1" onclick="return confirm('Run AI exposure scan for {{ profile.organization_domain }}? This may take several minutes.')">AI exposure scan</a>
-                                        </div>
+                                    {% if profile.ai_exposure_report_html or profile.ai_exposure_powerpoint_json or profile.ai_exposure_findings_json %}
                                         {% if profile.ai_exposure_report_html %}
                                             <a href="{% url 'download_ai_exposure_report' file_basename=profile.ai_exposure_report_html %}" class="btn btn-link btn-sm p-0 d-block">AI HTML report</a>
                                         {% endif %}
@@ -156,6 +153,13 @@
 
                                     {% elif profile.status == 'CTU_AUTOBRIEF_REPORT_REQUESTED' or profile.status == 'CTU_AUTOBRIEF_REPORT_REQUESTED_WITHOUT_VDR' %}
                                         <span class="text-muted small d-block mb-1">CTU Autobrief report pending (poll CTU for completion).</span>
+                                        {% if profile.ai_exposure_job_status == 'queued' or profile.ai_exposure_job_status == 'running' %}
+                                            <span class="text-muted small d-block mb-1">AI exposure scan queued or running.</span>
+                                        {% elif profile.ai_exposure_job_status == 'failed' %}
+                                            <span class="text-warning small d-block mb-1">AI exposure scan failed; Threat Profile zip will ship without AI HTML.</span>
+                                        {% elif profile.ai_exposure_job_status == 'skipped' %}
+                                            <span class="text-muted small d-block mb-1">AI exposure skipped (no organization domain).</span>
+                                        {% endif %}
                                         {% if profile.status == 'CTU_AUTOBRIEF_REPORT_REQUESTED_WITHOUT_VDR' %}
                                             <a href="{% url 'force_generate_ctu_autobrief_report' threat_profile_unique_id=profile.unique_id %}" class="btn btn-outline-primary btn-sm mx-1 my-1" onclick="return confirm('Submit a new CTU Autobrief job? This replaces the current report request ID.')" title="Call CTU again if the previous request failed or stalled">Resubmit to CTU</a><br/>
                                         {% endif %}
