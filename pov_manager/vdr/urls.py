@@ -12,6 +12,7 @@ from .views import (
     cleanup_vdr_profile,
     get_se_emails_list,
     download_ai_exposure_artifact,
+    view_integrated_threat_report,
 )
 
 urlpatterns = [
@@ -35,6 +36,12 @@ urlpatterns = [
         'threat-profile/ctu_autobrief_zip/<str:ctu_autobrief_report_id>',
         download_ctu_autobrief_zip_file,
         name='ctu_autobrief_zip_file'),
+
+    path(
+        'threat-profile/<str:threat_profile_unique_id>/integrated-report/',
+        view_integrated_threat_report,
+        name='view_integrated_threat_report',
+    ),
 
     path(
         'threat-profile/ai-exposure-download/<str:file_basename>',

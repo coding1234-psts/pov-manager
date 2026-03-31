@@ -41,6 +41,7 @@ from vdr.vdrapi import (
 )
 from vdr.utils import generate_vulnerabilities_excel, validate_ip_range
 from vdr.ai_exposure_workflow import schedule_ai_exposure_for_new_autobrief
+from vdr.integrated_threat_report import read_integrated_report_html_from_zip
 
 
 logger = logging.getLogger(__name__)
@@ -305,6 +306,38 @@ def download_ctu_autobrief_zip_file(
     if os.path.isfile(file_path):
         return FileResponse(open(file_path, "rb"), as_attachment=True, filename=f"{ctu_autobrief_report_id}.zip")
     return HttpResponseNotFound("<h1>Page not found</h1>")
+
+
+@login_required
+def view_integrated_threat_report(
+    request: HttpRequest, threat_profile_unique_id: str
+) -> HttpResponse:
+    """
+    Serve the integrated threat report HTML exactly as stored in the CTU autobrief zip
+    (same bytes as {report_id}_integrated_threat_report.html inside the archive).
+    """
+    profile = get_object_or_404(ThreatProfile, unique_id=threat_profile_unique_id)
+    if profile.status not in (
+        ThreatProfile.STATUS_CTU_AUTOBRIEF_REPORT_AVAILABLE,
+        ThreatProfile.STATUS_CTU_AUTOBRIEF_REPORT_AVAILABLE_WITHOUT_VDR,
+    ):
+        return HttpResponseNotFound(
+            "<h1>Not available</h1><p>Integrated report is only available after the "
+            "threat profile download is ready.</p>"
+        )
+    report_id = (profile.ctu_autobrief_report_id or "").strip()
+    if not report_id:
+        return HttpResponseNotFound("<h1>Not available</h1>")
+    zip_path = os.path.join(settings.CTU_REPORTS_PATH, f"{report_id}.zip")
+    raw = read_integrated_report_html_from_zip(zip_path, report_id)
+    if raw is None:
+        return HttpResponseNotFound(
+            "<h1>Integrated report not found</h1><p>The file may be missing from the "
+            "zip. Try regenerating the integrated report or re-downloading the bundle.</p>"
+        )
+    resp = HttpResponse(raw, content_type="text/html; charset=utf-8")
+    resp["Content-Disposition"] = "inline"
+    return resp
 
 
 @login_required

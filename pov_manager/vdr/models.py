@@ -97,6 +97,19 @@ class ThreatProfile(models.Model):
     created_date = models.DateTimeField(auto_now_add=True)
     modified_data = models.DateTimeField(auto_now=True)
 
+    def shows_integrated_threat_report_link(self) -> bool:
+        """
+        True when the integrated report drill-down and zip download should be offered
+        (requires a non-empty CTU report id and terminal AVAILABLE* status).
+        """
+        rid = (self.ctu_autobrief_report_id or "").strip()
+        if not rid:
+            return False
+        return self.status in (
+            self.STATUS_CTU_AUTOBRIEF_REPORT_AVAILABLE,
+            self.STATUS_CTU_AUTOBRIEF_REPORT_AVAILABLE_WITHOUT_VDR,
+        )
+
 
 class Vulnerabilities(models.Model):
     ASSET_TYPE_SERVER = 'server'

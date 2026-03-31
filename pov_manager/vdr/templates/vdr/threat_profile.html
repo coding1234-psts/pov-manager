@@ -96,7 +96,15 @@
                         {% for profile in profiles %}
                             <tr>
                                 <td class="align-middle">{{ profile.pk }}</td>
-                                <td class="align-middle" data-column="organization_name"><b>{{ profile.organization_name }}</b></td>
+                                <td class="align-middle" data-column="organization_name">
+                                    <b>
+                                    {% if profile.shows_integrated_threat_report_link %}
+                                        <a class="link-primary" href="{% url 'view_integrated_threat_report' threat_profile_unique_id=profile.unique_id %}">{{ profile.organization_name }}</a>
+                                    {% else %}
+                                        {{ profile.organization_name }}
+                                    {% endif %}
+                                    </b>
+                                </td>
                                 <td class="align-middle" data-column="organization_email_domains">
                                     {% if profile.organization_email_domains %}
                                         {% for domain in profile.organization_email_domains %}

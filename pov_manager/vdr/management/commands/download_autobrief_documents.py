@@ -9,6 +9,7 @@ from django.conf import settings
 
 from vdr.ai_exposure_workflow import ai_exposure_job_is_terminal, ctu_progress_is_complete
 from vdr.ctuapi import report_status, download_report
+from vdr.integrated_threat_report import append_integrated_report_to_zip
 from vdr.models import ThreatProfile, Vulnerabilities
 from vdr.utils import generate_vulnerabilities_excel
 from vdr.vdrapi import disable_all_schedules, VDRAPIError
@@ -105,6 +106,20 @@ class Command(BaseCommand):
             if path.isfile(file_path):
                 self.add_vulnerabilities_list_in_zip(profile, file_path)
                 self.add_ai_exposure_html_to_zip(profile, file_path)
+                if append_integrated_report_to_zip(
+                    profile, file_path, profile.ctu_autobrief_report_id
+                ):
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Integrated threat report added to ZIP "
+                            f"({profile.ctu_autobrief_report_id}_integrated_threat_report.html)."
+                        )
+                    )
+                else:
+                    self.stderr.write(
+                        "Warning: Could not add integrated threat report to ZIP "
+                        "(see logs)."
+                    )
 
                 if profile.status == ThreatProfile.STATUS_CTU_AUTOBRIEF_REPORT_REQUESTED:
                     profile.status = ThreatProfile.STATUS_CTU_AUTOBRIEF_REPORT_AVAILABLE

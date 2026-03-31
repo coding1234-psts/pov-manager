@@ -60,6 +60,9 @@ _TYPE_TO_REMEDIATION_KEY = {
     "chatbot_fingerprint":  "chatbot_no_validation",
 }
 
+# Wrapper for scoped CSS so the report can be embedded in the integrated HTML doc.
+AI_REPORT_ROOT_CLASS = "ai-exposure-report"
+
 
 # ---------------------------------------------------------------------------
 # Config loader
@@ -75,140 +78,146 @@ def _load_config() -> dict:
 # ---------------------------------------------------------------------------
 
 def _css(combined_risk_color: str) -> str:
+    r = AI_REPORT_ROOT_CLASS
     return f"""
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{
+  .{r},
+  .{r} * {{
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }}
+  .{r} {{
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: #f5f5f7; color: #1d1d1f; font-size: 15px; line-height: 1.6;
   }}
 
   /* ---- Header ---- */
-  .header {{ background: #1d1d1f; color: #fff; padding: 36px 48px; }}
-  .header h1 {{ font-size: 26px; font-weight: 700; margin-bottom: 6px; }}
-  .header .meta {{ color: #999; font-size: 13px; line-height: 1.8; }}
+  .{r} .header {{ background: #1d1d1f; color: #fff; padding: 36px 48px; }}
+  .{r} .header h1 {{ font-size: 26px; font-weight: 700; margin-bottom: 6px; }}
+  .{r} .header .meta {{ color: #999; font-size: 13px; line-height: 1.8; }}
 
   /* ---- Page container ---- */
-  .container {{ max-width: 1140px; margin: 32px auto; padding: 0 24px; }}
+  .{r} .container {{ max-width: 1140px; margin: 32px auto; padding: 0 24px; }}
 
   /* ---- Score card ---- */
-  .score-card {{
+  .{r} .score-card {{
     background: #fff; border-radius: 12px; padding: 32px 40px;
     margin-bottom: 28px; display: flex; align-items: center; gap: 40px;
     box-shadow: 0 1px 4px rgba(0,0,0,.08);
   }}
-  .score-ring {{
+  .{r} .score-ring {{
     width: 110px; height: 110px; border-radius: 50%;
     border: 8px solid {combined_risk_color};
     display: flex; flex-direction: column;
     align-items: center; justify-content: center; flex-shrink: 0;
   }}
-  .score-ring .num {{ font-size: 32px; font-weight: 800; color: {combined_risk_color}; }}
-  .score-ring .lbl {{ font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; }}
-  .score-meta h2 {{ font-size: 22px; font-weight: 700; color: {combined_risk_color}; margin-bottom: 8px; }}
-  .score-meta p {{ color: #444; max-width: 640px; }}
+  .{r} .score-ring .num {{ font-size: 32px; font-weight: 800; color: {combined_risk_color}; }}
+  .{r} .score-ring .lbl {{ font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; }}
+  .{r} .score-meta h2 {{ font-size: 22px; font-weight: 700; color: {combined_risk_color}; margin-bottom: 8px; }}
+  .{r} .score-meta p {{ color: #444; max-width: 640px; }}
 
   /* ---- Generic section card ---- */
-  section {{
+  .{r} section {{
     background: #fff; border-radius: 12px; padding: 28px 36px;
     margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
   }}
-  section h2 {{
+  .{r} section h2 {{
     font-size: 17px; font-weight: 700; margin-bottom: 20px;
     border-bottom: 1px solid #e8e8ed; padding-bottom: 12px; color: #1d1d1f;
   }}
 
   /* ---- Tables ---- */
-  table {{ width: 100%; border-collapse: collapse; font-size: 13.5px; }}
-  th {{
+  .{r} table {{ width: 100%; border-collapse: collapse; font-size: 13.5px; }}
+  .{r} th {{
     text-align: left; padding: 10px 12px; background: #f5f5f7;
     font-weight: 600; color: #555; border-bottom: 1px solid #e0e0e0;
   }}
-  td {{
+  .{r} td {{
     padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top;
   }}
-  tr:last-child td {{ border-bottom: none; }}
-  .url {{ font-size: 12px; color: #555; word-break: break-all; }}
-  .evidence {{ font-size: 12px; color: #333; max-width: 260px; }}
+  .{r} tr:last-child td {{ border-bottom: none; }}
+  .{r} .url {{ font-size: 12px; color: #555; word-break: break-all; }}
+  .{r} .evidence {{ font-size: 12px; color: #333; max-width: 260px; }}
 
   /* ---- Badges ---- */
-  .badge {{
+  .{r} .badge {{
     display: inline-block; padding: 2px 10px; border-radius: 20px;
     color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .4px;
   }}
 
   /* ---- Scorecard table ---- */
-  .scorecard-table th {{ white-space: nowrap; }}
-  .scorecard-table td.score-cell {{
+  .{r} .scorecard-table th {{ white-space: nowrap; }}
+  .{r} .scorecard-table td.score-cell {{
     font-weight: 700; font-size: 15px; text-align: right;
   }}
-  .scorecard-table td.findings-cell {{ text-align: right; }}
+  .{r} .scorecard-table td.findings-cell {{ text-align: right; }}
 
   /* ---- Asset details/summary ---- */
-  details {{
+  .{r} details {{
     background: #fff; border-radius: 12px;
     margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08);
     overflow: hidden;
   }}
-  summary {{
+  .{r} summary {{
     padding: 18px 28px; cursor: pointer; list-style: none;
     display: flex; align-items: center; gap: 14px;
     font-size: 15px; font-weight: 600; color: #1d1d1f;
     user-select: none;
     transition: background 0.15s;
   }}
-  summary::-webkit-details-marker {{ display: none; }}
-  summary::before {{
+  .{r} summary::-webkit-details-marker {{ display: none; }}
+  .{r} summary::before {{
     content: '\\25B6';
     font-size: 11px; color: #888;
     flex-shrink: 0;
     transition: transform 0.2s;
   }}
-  details[open] > summary::before {{
+  .{r} details[open] > summary::before {{
     content: '\\25BC';
   }}
-  summary:hover {{ background: #f5f5f7; }}
-  .summary-hostname {{ flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-  .summary-meta {{ font-size: 12.5px; color: #666; font-weight: 400; white-space: nowrap; }}
+  .{r} summary:hover {{ background: #f5f5f7; }}
+  .{r} .summary-hostname {{ flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+  .{r} .summary-meta {{ font-size: 12.5px; color: #666; font-weight: 400; white-space: nowrap; }}
 
   /* ---- Details inner content ---- */
-  .details-body {{ padding: 0 28px 28px 28px; }}
-  .details-body h3 {{
+  .{r} .details-body {{ padding: 0 28px 28px 28px; }}
+  .{r} .details-body h3 {{
     font-size: 14px; font-weight: 600; color: #444;
     margin: 24px 0 10px; text-transform: uppercase; letter-spacing: .5px;
   }}
-  .details-body h3:first-child {{ margin-top: 4px; }}
+  .{r} .details-body h3:first-child {{ margin-top: 4px; }}
 
   /* ---- Score breakdown ---- */
-  .breakdown-table td:first-child {{ color: #444; }}
-  .breakdown-total td {{ font-weight: 700; border-top: 2px solid #e0e0e0 !important; }}
+  .{r} .breakdown-table td:first-child {{ color: #444; }}
+  .{r} .breakdown-total td {{ font-weight: 700; border-top: 2px solid #e0e0e0 !important; }}
 
   /* ---- Remediation ---- */
-  .remediation-card {{
+  .{r} .remediation-card {{
     border-left: 4px solid #0071e3; padding: 16px 20px;
     margin-bottom: 20px; background: #f9f9fb; border-radius: 0 8px 8px 0;
   }}
-  .remediation-card:last-child {{ margin-bottom: 0; }}
-  .remediation-card h3 {{ font-size: 15px; font-weight: 700; margin-bottom: 10px; }}
-  .remediation-card ul {{ margin-left: 20px; }}
-  .remediation-card li {{ margin-bottom: 6px; font-size: 13.5px; color: #333; }}
-  .rem-priority {{
+  .{r} .remediation-card:last-child {{ margin-bottom: 0; }}
+  .{r} .remediation-card h3 {{ font-size: 15px; font-weight: 700; margin-bottom: 10px; }}
+  .{r} .remediation-card ul {{ margin-left: 20px; }}
+  .{r} .remediation-card li {{ margin-bottom: 6px; font-size: 13.5px; color: #333; }}
+  .{r} .rem-priority {{
     display: inline-block; font-size: 11px; font-weight: 700;
     padding: 2px 10px; border-radius: 20px; margin-bottom: 10px; color: #fff;
   }}
-  .rem-priority.critical {{ background: #b30000; }}
-  .rem-priority.high {{ background: #b35c00; }}
-  .rem-priority.medium {{ background: #0071e3; }}
+  .{r} .rem-priority.critical {{ background: #b30000; }}
+  .{r} .rem-priority.high {{ background: #b35c00; }}
+  .{r} .rem-priority.medium {{ background: #0071e3; }}
 
   /* ---- Misc ---- */
-  code {{ background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; }}
-  pre {{
+  .{r} code {{ background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; }}
+  .{r} pre {{
     background: #f5f5f7; padding: 14px; border-radius: 8px; font-size: 12px;
     overflow-x: auto; white-space: pre-wrap; word-break: break-word;
   }}
-  .none {{ color: #888; font-style: italic; font-size: 13.5px; }}
-  .error-row {{ background: #fff5f5; color: #b30000; font-size: 13px; padding: 14px 0; }}
+  .{r} .none {{ color: #888; font-style: italic; font-size: 13.5px; }}
+  .{r} .error-row {{ background: #fff5f5; color: #b30000; font-size: 13px; padding: 14px 0; }}
 
-  footer {{
+  .{r} footer {{
     text-align: center; color: #999; font-size: 12px; padding: 32px;
   }}
 """
@@ -534,6 +543,7 @@ def generate_combined_report(
 </head>
 <body>
 
+<div class="{AI_REPORT_ROOT_CLASS}">
 <div class="header">
   <h1>AI Public Exposure Report</h1>
   <div class="meta">
@@ -588,6 +598,8 @@ def generate_combined_report(
 <footer>
   Generated by AI Exposure Analyzer &nbsp;|&nbsp; {_esc(scan_time)}
 </footer>
+
+</div>
 
 </body>
 </html>"""
