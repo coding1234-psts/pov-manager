@@ -2,9 +2,9 @@
 
 This is a spin-off for the PoV Manager App used to run the Threat Profile Tool. 
 It includes the following: 
-**- **Merged Ai-Exposure-Analyzer***
-**- **Expanded report view***
-**- **Updated .zip report archive with full report html and Ai-Exposure-Analyzer report html ***
+- **Merged Ai-Exposure-Analyzer**
+- **Expanded report view**
+- **Updated .zip report archive with full report html and Ai-Exposure-Analyzer report html**
 
 ## How to Install Locally
 
