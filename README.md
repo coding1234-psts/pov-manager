@@ -1,8 +1,10 @@
 # PoV Manager
 
-PoV Manager is the tool used by the PoV Specialists to manage PoVs.
-
-For detailed information, user documentation or techincal documentation, please visit [PoV Manager documentation](https://secureworks.atlassian.net/wiki/spaces/LS/pages/468895663237/PoV+Manager).
+This is a spin-off for the PoV Manager App used to run the Threat Profile Tool. 
+It includes the following: 
+**- **Merged Ai-Exposure-Analyzer***
+**- **Expanded report view***
+**- **Updated .zip report archive with full report html and Ai-Exposure-Analyzer report html ***
 
 ## How to Install Locally
 
@@ -13,7 +15,7 @@ For detailed information, user documentation or techincal documentation, please 
 ### Installation Steps
 1. **Clone the Repository**  
    ```bash
-   git clone https://code.8labs.io/project/presales/pov-manager.git
+   git clone https://github.com/coding1234-psts/pov-manager.git
    cd pov-manager
    ```
 
