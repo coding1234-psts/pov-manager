@@ -2,6 +2,12 @@ __pycache__/
 .pyc
 .idea
 .env
+# Local env variants and overrides (never commit secrets)
+.env.*
+!.env.example
+.envrc
+docker-compose.override.yml
+*.pem
 ctu-reports/*.zip
 # Local Mongo bootstrap (copy from init-mongo.js.example)
 mongo_db/init-mongo.js
