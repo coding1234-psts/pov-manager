@@ -555,8 +555,9 @@ def _build_combined_report_container_inner_html(
 
 def render_combined_report_embed_from_payload(payload: dict) -> str:
     """
-    Scoped ``<style>`` plus ``.{AI_REPORT_ROOT_CLASS}`` body (no page header/footer)
-    for embedding in the integrated threat report.
+    ``.{AI_REPORT_ROOT_CLASS}`` subtree (no page header/footer) for the integrated
+    threat report. The host document supplies FireComply-themed CSS; the root sets
+    ``--ai-risk-color`` for the score ring and headings.
     """
     asset_results = list(payload.get("assets") or [])
     combined = payload.get("combined_score")
@@ -566,9 +567,10 @@ def render_combined_report_embed_from_payload(payload: dict) -> str:
         asset_results, combined
     )
     r = AI_REPORT_ROOT_CLASS
+    rc = _html_escape_module.escape(str(risk_color or "#555"), quote=True)
     return (
-        f"<style>{_css(risk_color)}</style>\n"
-        f'<div class="{r}"><div class="container">{inner}\n</div></div>'
+        f'<div class="{r}" style="--ai-risk-color: {rc}">'
+        f'<div class="container">{inner}\n</div></div>'
     )
 
 

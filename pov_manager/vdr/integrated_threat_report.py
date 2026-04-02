@@ -1012,6 +1012,293 @@ def build_integrated_threat_report_html(
   }
   .exec-ai-stat .val { font-size: 1.75rem; font-weight: 800; color: var(--fc-deep); }
   .exec-ai-stat .lbl { margin-top: 6px; font-size: 12px; color: var(--fc-grey); line-height: 1.35; }
+
+  /* AI exposure embed — same FireComply tokens as the rest of the report */
+  .ai-embed .ai-exposure-report {
+    --ai-risk-color: var(--fc-orange);
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.55;
+    background: transparent;
+    color: var(--fc-text);
+  }
+  .ai-embed .ai-exposure-report *,
+  .ai-embed .ai-exposure-report *::before,
+  .ai-embed .ai-exposure-report *::after {
+    box-sizing: border-box;
+  }
+  .ai-embed .ai-exposure-report .container {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  .ai-embed .ai-exposure-report .score-card {
+    background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+    border: 1px solid var(--fc-line);
+    border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(0, 26, 71, 0.06);
+    padding: 28px 32px;
+    margin-bottom: 22px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .ai-embed .ai-exposure-report .score-ring {
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    border: 7px solid var(--ai-risk-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .ai-embed .ai-exposure-report .score-ring .num {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--ai-risk-color);
+  }
+  .ai-embed .ai-exposure-report .score-ring .lbl {
+    font-size: 10px;
+    color: var(--fc-grey);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .ai-embed .ai-exposure-report .score-meta h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--ai-risk-color);
+  }
+  .ai-embed .ai-exposure-report .score-meta p {
+    color: var(--fc-text);
+    opacity: 0.9;
+    max-width: 640px;
+  }
+  .ai-embed .ai-exposure-report > .container > section {
+    background: #fff;
+    border: 1px solid var(--fc-line);
+    border-radius: 14px;
+    box-shadow: 0 2px 16px rgba(0, 26, 71, 0.05);
+    padding: 22px 24px;
+    margin-bottom: 18px;
+  }
+  .ai-embed .ai-exposure-report > .container > section[style*="transparent"] {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: 0;
+  }
+  .ai-embed .ai-exposure-report > .container > section h2 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--fc-line);
+    color: var(--fc-dark);
+  }
+  .ai-embed .ai-exposure-report > .container > section[style*="transparent"] > h2 {
+    border-bottom: none;
+    padding: 0 0 12px;
+    margin-bottom: 16px;
+  }
+  .ai-embed .ai-exposure-report table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .ai-embed .ai-exposure-report th {
+    text-align: left;
+    padding: 10px 12px;
+    background: linear-gradient(180deg, var(--fc-dark) 0%, var(--fc-deep) 100%);
+    color: #fff;
+    font-weight: 600;
+    border: 1px solid var(--fc-line);
+  }
+  .ai-embed .ai-exposure-report td {
+    padding: 10px 12px;
+    border: 1px solid var(--fc-line);
+    vertical-align: top;
+    color: var(--fc-text);
+  }
+  .ai-embed .ai-exposure-report .scorecard-table th,
+  .ai-embed .ai-exposure-report .breakdown-table th {
+    white-space: nowrap;
+  }
+  .ai-embed .ai-exposure-report .scorecard-table td.score-cell {
+    font-weight: 700;
+    font-size: 15px;
+    text-align: right;
+  }
+  .ai-embed .ai-exposure-report .scorecard-table td.findings-cell {
+    text-align: right;
+  }
+  .ai-embed .ai-exposure-report .breakdown-table td:first-child {
+    color: var(--fc-text);
+    opacity: 0.88;
+  }
+  .ai-embed .ai-exposure-report .breakdown-total td {
+    font-weight: 700;
+    border-top: 2px solid var(--fc-line) !important;
+  }
+  .ai-embed .ai-exposure-report .url {
+    font-size: 12px;
+    color: var(--fc-grey);
+    word-break: break-all;
+  }
+  .ai-embed .ai-exposure-report .evidence {
+    font-size: 12px;
+    color: var(--fc-text);
+    max-width: 280px;
+  }
+  .ai-embed .ai-exposure-report .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+  .ai-embed .ai-exposure-report details {
+    background: #fff;
+    border: 1px solid var(--fc-line);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 12px rgba(0, 26, 71, 0.04);
+    overflow: hidden;
+  }
+  .ai-embed .ai-exposure-report summary {
+    padding: 16px 22px;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fc-dark);
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .ai-embed .ai-exposure-report summary::-webkit-details-marker {
+    display: none;
+  }
+  .ai-embed .ai-exposure-report summary::before {
+    content: '\\25B6';
+    font-size: 11px;
+    color: var(--fc-grey);
+    flex-shrink: 0;
+  }
+  .ai-embed .ai-exposure-report details[open] > summary::before {
+    content: '\\25BC';
+  }
+  .ai-embed .ai-exposure-report summary:hover {
+    background: var(--fc-neutral);
+  }
+  .ai-embed .ai-exposure-report .summary-hostname {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ai-embed .ai-exposure-report .summary-meta {
+    font-size: 12.5px;
+    color: var(--fc-grey);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .ai-embed .ai-exposure-report .details-body {
+    padding: 0 22px 22px;
+  }
+  .ai-embed .ai-exposure-report .details-body h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--fc-deep);
+    margin: 20px 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .ai-embed .ai-exposure-report .details-body h3:first-child {
+    margin-top: 4px;
+  }
+  .ai-embed .ai-exposure-report .remediation-card {
+    border-left: 4px solid var(--fc-sky);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    background: linear-gradient(90deg, rgba(0, 156, 251, 0.06), #f8fbff);
+    border-radius: 0 12px 12px 0;
+  }
+  .ai-embed .ai-exposure-report .remediation-card:last-child {
+    margin-bottom: 0;
+  }
+  .ai-embed .ai-exposure-report .remediation-card h3 {
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fc-dark);
+    margin: 10px 0 8px;
+  }
+  .ai-embed .ai-exposure-report .rem-priority {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    color: #fff;
+  }
+  .ai-embed .ai-exposure-report .rem-priority.critical {
+    background: var(--fc-red);
+  }
+  .ai-embed .ai-exposure-report .rem-priority.high {
+    background: var(--fc-orange);
+  }
+  .ai-embed .ai-exposure-report .rem-priority.medium {
+    background: var(--fc-sky);
+  }
+  .ai-embed .ai-exposure-report .remediation-card ul {
+    margin-left: 20px;
+  }
+  .ai-embed .ai-exposure-report .remediation-card li {
+    margin-bottom: 6px;
+    font-size: 13.5px;
+    color: var(--fc-text);
+    line-height: 1.45;
+  }
+  .ai-embed .ai-exposure-report code {
+    background: var(--fc-neutral);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--fc-deep);
+  }
+  .ai-embed .ai-exposure-report pre {
+    background: var(--fc-neutral);
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border: 1px solid var(--fc-line);
+  }
+  .ai-embed .ai-exposure-report .none {
+    color: var(--fc-grey);
+    font-style: italic;
+    font-size: 13.5px;
+  }
+  .ai-embed .ai-exposure-report .error-row {
+    background: rgba(234, 0, 34, 0.06);
+    color: var(--fc-red);
+    font-size: 13px;
+  }
 """
 
     tab_script = """
