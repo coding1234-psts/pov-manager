@@ -13,6 +13,7 @@ import re
 import tempfile
 import zipfile
 from collections import Counter
+from dataclasses import dataclass, replace
 from typing import Any
 
 import pandas as pd
@@ -45,6 +46,21 @@ MSG_CREDENTIALS_DISCLAIMER = (
     "does not constitute authentication of current account status or live "
     "credential validity."
 )
+
+
+@dataclass
+class ExecutiveSummaryMetrics:
+    """Counts/strings for the Executive Summary tab; None usually means omit that tile."""
+
+    # Suspicious-domain rows (non-empty domain); always shown when set, including 0.
+    sd_typosquat: int | None = None
+    sd_high_risk: int | None = None
+    lc_distinct_accounts: int | None = None
+    lc_exec_num: int | None = None
+    lc_exec_den: int | None = None
+    lc_timeline: str | None = None
+    ai_score: int | None = None
+    ai_asset_count: int | None = None
 
 
 def integrated_report_zip_entry_name(report_id: str) -> str:
@@ -357,6 +373,215 @@ def _lc_kpi_value_date_range(b: pd.DataFrame) -> str:
     return f"{start_lbl} -> {end_lbl}"
 
 
+def _compute_executive_summary_metrics(
+    zipf: zipfile.ZipFile, profile: ThreatProfile
+) -> ExecutiveSummaryMetrics:
+    m = ExecutiveSummaryMetrics()
+
+    # —— Suspicious domains ——
+    member_sd = _find_zip_member_by_suffix(zipf, SUFFIX_SUSPICIOUS)
+    if member_sd:
+        df_sd = _read_excel_sheet(zipf, member_sd, "Suspicious domains")
+        if df_sd is not None and "domain" in df_sd.columns:
+            dfc = df_sd.copy()
+            dfc["_domain"] = dfc["domain"].astype(str).str.strip()
+            dfc = dfc[dfc["_domain"].str.len() > 0]
+            # Row count with non-empty domain; always set (including 0) so the tile always shows.
+            m.sd_typosquat = len(dfc)
+            if len(dfc) > 0:
+                rs = pd.to_numeric(dfc.get("risk_score"), errors="coerce")
+                dfc["_rs"] = rs
+                if dfc["_rs"].notna().any():
+                    high_n = int((dfc["_rs"] >= 80).sum())
+                    if high_n > 0:
+                        m.sd_high_risk = high_n
+
+    # —— Leaked credentials ——
+    member_lc = _find_zip_member_by_suffix(zipf, SUFFIX_CREDENTIALS)
+    if not member_lc:
+        return m
+    breaches = _read_excel_sheet(zipf, member_lc, "Breaches")
+    if breaches is None or not {"Email", "Breach", "Date", "Data Leaked"}.issubset(
+        set(breaches.columns)
+    ):
+        return m
+    b = breaches.copy()
+    b["_em"] = b["Email"].map(_normalize_email)
+    data_rows = b[b["_em"].notna() | b["Breach"].notna()]
+    if len(data_rows) == 0:
+        return m
+    b = data_rows
+
+    if "Email" in b.columns:
+        n_em = (
+            b["Email"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .replace("", pd.NA)
+            .dropna()
+            .nunique()
+        )
+        if int(n_em) > 0:
+            m.lc_distinct_accounts = int(n_em)
+
+    dr = _lc_kpi_value_date_range(b)
+    if dr != MSG_METRIC_NONE:
+        m.lc_timeline = dr
+
+    exec_emails = [_normalize_email(e) for e in (profile.organization_emails or [])]
+    exec_emails = [e for e in exec_emails if e]
+    if exec_emails:
+        exec_set = set(exec_emails)
+        sub = b[b["_em"].isin(exec_set)]
+        x = int(sub["_em"].nunique()) if len(sub) else 0
+        if x > 0:
+            m.lc_exec_num = x
+            m.lc_exec_den = len(exec_set)
+
+    return m
+
+
+def _parse_ai_exec_metrics_from_profile(
+    profile: ThreatProfile,
+) -> tuple[int | None, int | None]:
+    basename = (profile.ai_exposure_report_html or "").strip()
+    if not basename or profile.ai_exposure_job_status != ThreatProfile.AI_EXPOSURE_JOB_READY:
+        return None, None
+    ai_path = os.path.join(settings.CTU_REPORTS_PATH, basename)
+    if not os.path.isfile(ai_path):
+        return None, None
+    try:
+        with open(ai_path, "rb") as f:
+            raw = f.read()
+        soup = BeautifulSoup(raw, "html.parser")
+        root = soup.select_one(f"div.{AI_REPORT_ROOT_CLASS}") or soup
+        num_el = root.select_one(".score-ring .num")
+        score: int | None = None
+        if num_el:
+            t = num_el.get_text(strip=True)
+            if t.isdigit():
+                score = int(t)
+        rows = root.select("table.scorecard-table tbody tr")
+        n_assets = len(rows) if rows else None
+        if n_assets == 0:
+            n_assets = None
+        return score, n_assets
+    except Exception as e:
+        logger.warning("Could not parse AI metrics for executive summary: %s", e)
+        return None, None
+
+
+def _build_executive_summary_html(
+    metrics: ExecutiveSummaryMetrics,
+    profile: ThreatProfile,
+) -> str:
+    parts: list[str] = []
+    parts.append('<div class="exec-wrap">')
+    parts.append('<div class="exec-head">')
+    parts.append("<h2>Executive Summary</h2>")
+    parts.append(
+        "<p>Priority indicators from available assessments in this bundle. "
+        "Figures appear only when qualifying data exists.</p>"
+    )
+    parts.append("</div>")
+
+    sd_tiles: list[str] = []
+    if metrics.sd_typosquat is not None:
+        v = html.escape(str(metrics.sd_typosquat))
+        sd_tiles.append(
+            f'<div class="exec-tile"><div class="val">{v}</div>'
+            f'<div class="lbl">Typosquat-related domain records</div></div>'
+        )
+    if metrics.sd_high_risk is not None:
+        v = html.escape(str(metrics.sd_high_risk))
+        sd_tiles.append(
+            f'<div class="exec-tile exec-tile-warn"><div class="val">{v}</div>'
+            f'<div class="lbl">Records with risk score ≥ 80</div></div>'
+        )
+
+    lc_tiles: list[str] = []
+    if metrics.lc_distinct_accounts is not None:
+        v = html.escape(str(metrics.lc_distinct_accounts))
+        lc_tiles.append(
+            f'<div class="exec-tile exec-tile-emphasis"><div class="val">{v}</div>'
+            f'<div class="lbl">Distinct accounts with breach exposure</div></div>'
+        )
+    if metrics.lc_exec_num is not None and metrics.lc_exec_den is not None:
+        num_e = html.escape(str(metrics.lc_exec_num))
+        den_e = html.escape(str(metrics.lc_exec_den))
+        lc_tiles.append(
+            f'<div class="exec-tile exec-tile-emphasis exec-tile-warn">'
+            f'<div class="val">{num_e} <span class="exec-of">of</span> {den_e}</div>'
+            f'<div class="lbl">Executive accounts with exposure (in-scope)</div></div>'
+        )
+    if metrics.lc_timeline is not None:
+        v = html.escape(metrics.lc_timeline)
+        lc_tiles.append(
+            f'<div class="exec-tile exec-tile-timeline"><div class="val">{v}</div>'
+            f'<div class="lbl">Breach activity time span</div></div>'
+        )
+
+    show_sd_col = len(sd_tiles) > 0
+    show_lc_col = len(lc_tiles) > 0
+
+    if show_sd_col or show_lc_col:
+        mega_mod = (
+            " exec-mega-inner--both"
+            if show_sd_col and show_lc_col
+            else " exec-mega-inner--one"
+        )
+        parts.append(
+            f'<div class="exec-mega"><div class="exec-mega-inner{mega_mod}">'
+        )
+        if show_sd_col:
+            parts.append('<div class="exec-category">')
+            parts.append(
+                '<div class="exec-category-title">Suspicious domains</div>'
+                f'<div class="exec-tiles-center">{"".join(sd_tiles)}</div>'
+            )
+            parts.append("</div>")
+        if show_sd_col and show_lc_col:
+            parts.append('<div class="exec-mega-divider" aria-hidden="true"></div>')
+        if show_lc_col:
+            parts.append('<div class="exec-category exec-category-wide">')
+            parts.append(
+                '<div class="exec-category-title">Leaked credentials</div>'
+                f'<div class="exec-tiles-center">{"".join(lc_tiles)}</div>'
+            )
+            parts.append("</div>")
+        parts.append("</div></div>")
+
+    ai_parts: list[str] = []
+    if metrics.ai_score is not None or metrics.ai_asset_count is not None:
+        ai_parts.append('<div class="exec-ai-compact">')
+        if metrics.ai_score is not None:
+            score_html = html.escape(str(metrics.ai_score))
+            ai_parts.append(
+                '<div class="exec-hero-ai">'
+                '<div class="eyebrow">AI exposure</div>'
+                '<div class="score-row">'
+                f'<span class="score-num">{score_html}</span>'
+                '<span class="score-unit">/ 100</span></div>'
+                "<p class=\"score-desc\">Overall AI exposure score — composite of assessed "
+                "public attack surface.</p></div>"
+            )
+        if metrics.ai_asset_count is not None:
+            assets_html = html.escape(str(metrics.ai_asset_count))
+            ai_parts.append(
+                '<div class="exec-ai-stat">'
+                '<div class="eyebrow">Attack surface</div>'
+                f'<div class="val">{assets_html}</div>'
+                '<div class="lbl">Assets assessed (URLs / hostnames in scope)</div>'
+                "</div>"
+            )
+        ai_parts.append("</div>")
+    parts.append("".join(ai_parts))
+    parts.append("</div>")
+    return "".join(parts)
+
+
 def _section_leaked_credentials(
     zipf: zipfile.ZipFile, profile: ThreatProfile
 ) -> tuple[str, bool]:
@@ -553,6 +778,7 @@ def build_integrated_threat_report_html(
     """
     try:
         with zipfile.ZipFile(zip_path, "r") as zipf:
+            metrics = _compute_executive_summary_metrics(zipf, profile)
             sd_inner, show_sd = _section_suspicious_domains(zipf)
             lc_inner, show_lc = _section_leaked_credentials(zipf, profile)
     except zipfile.BadZipFile as e:
@@ -563,8 +789,15 @@ def build_integrated_threat_report_html(
         return None
 
     ai_inner, show_ai = _ai_tab_content(profile)
+    if show_ai:
+        ascore, aassets = _parse_ai_exec_metrics_from_profile(profile)
+        metrics = replace(metrics, ai_score=ascore, ai_asset_count=aassets)
+
+    exec_inner = _build_executive_summary_html(metrics, profile)
 
     tabs: list[tuple[str, str, str]] = []
+    if show_sd or show_lc or show_ai:
+        tabs.append(("exec", "tab-exec", "Executive Summary"))
     if show_sd:
         tabs.append(("sd", "tab-sd", "Suspicious domains"))
     if show_lc:
@@ -572,7 +805,12 @@ def build_integrated_threat_report_html(
     if show_ai:
         tabs.append(("ai", "tab-ai", "AI exposure"))
 
-    panel_html_by_key = {"sd": sd_inner, "lc": lc_inner, "ai": ai_inner}
+    panel_html_by_key = {
+        "exec": exec_inner,
+        "sd": f'<div class="detail-panel">{sd_inner}</div>',
+        "lc": f'<div class="detail-panel">{lc_inner}</div>',
+        "ai": f'<div class="detail-panel">{ai_inner}</div>',
+    }
     tab_buttons = []
     tab_panels_filled = []
     for i, (key, tid, label) in enumerate(tabs):
@@ -603,52 +841,210 @@ def build_integrated_threat_report_html(
     org_esc = html.escape(profile.organization_name or "")
     title = f"Integrated threat report — {profile.organization_name}"
 
+    # Theme aligned with Sophos FireComply palette (see firecomply preview).
     css = """
+  :root {
+    --fc-dark: #001A47;
+    --fc-blue: #2006F7;
+    --fc-deep: #10037C;
+    --fc-purple: #5A00FF;
+    --fc-violet: #B529F7;
+    --fc-sky: #009CFB;
+    --fc-cyan: #00EDFF;
+    --fc-green: #00F2B3;
+    --fc-red: #EA0022;
+    --fc-orange: #F29400;
+    --fc-neutral: #EDF2F9;
+    --fc-grey: #6A889B;
+    --fc-text: #0a1628;
+    --fc-line: rgba(0, 26, 71, 0.12);
+    --fc-glow-deep: 0 12px 40px rgba(16, 3, 124, 0.25);
+    --fc-glow-blue: 0 8px 32px rgba(32, 6, 247, 0.22);
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #f5f5f7; color: #1d1d1f; font-size: 15px; line-height: 1.6; }
-  .page-header { background: #10037C; color: #fff; padding: 28px 48px 36px; }
-  .page-header h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
-  .page-header .meta { color: #999; font-size: 13px; }
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--fc-neutral); color: var(--fc-text); font-size: 15px; line-height: 1.55;
+  }
+  .page-header {
+    background: linear-gradient(125deg, #001A47 0%, #10037C 42%, #1a0d6e 100%);
+    color: #fff; padding: 28px 48px 32px;
+    border-bottom: 3px solid transparent;
+    border-image: linear-gradient(90deg, var(--fc-cyan), var(--fc-sky), var(--fc-violet)) 1;
+  }
+  .page-header h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; }
+  .page-header .meta { color: rgba(255,255,255,.78); font-size: 13px; }
   .container { max-width: 1140px; margin: 24px auto; padding: 0 24px 48px; }
-  .report-shell { background: #fff; border-radius: 12px; padding: 0;
-    box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; }
-  .tab-bar { display: flex; flex-wrap: wrap; gap: 10px; padding: 20px 24px 16px;
-    border-bottom: 1px solid #e8e8ed; background: #fafafa; }
-  .report-tab { appearance: none; border: 1px solid #d2d2d7; background: #fff;
-    color: #1d1d1f; padding: 10px 18px; border-radius: 8px; font-size: 14px;
-    font-weight: 600; cursor: pointer; font-family: inherit; }
-  .report-tab:hover { border-color: #0071b3; color: #0071b3; }
-  .report-tab.is-active { background: #10037C; color: #fff; border-color: #10037C; }
-  .report-tab:focus-visible { outline: 2px solid #0071b3; outline-offset: 2px; }
-  .tab-panels { padding: 24px 28px 32px; }
+  .report-shell {
+    background: #fff; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 4px 32px rgba(0, 26, 71, 0.08); border: 1px solid var(--fc-line);
+  }
+  .tab-bar {
+    display: flex; flex-wrap: wrap; gap: 8px; padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--fc-line);
+    background: linear-gradient(180deg, #f8fafc 0%, var(--fc-neutral) 100%);
+  }
+  .report-tab {
+    appearance: none; border: 1px solid var(--fc-line); background: #fff;
+    color: var(--fc-deep); padding: 10px 18px; border-radius: 10px; font-size: 14px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: border-color .15s, color .15s, box-shadow .15s;
+  }
+  .report-tab:hover {
+    border-color: var(--fc-sky); color: var(--fc-blue);
+    box-shadow: 0 2px 12px rgba(0, 156, 251, 0.2);
+  }
+  .report-tab.is-active {
+    background: linear-gradient(135deg, var(--fc-deep) 0%, #1a0a6e 100%);
+    color: #fff; border-color: var(--fc-deep); box-shadow: var(--fc-glow-deep);
+  }
+  .report-tab:focus-visible { outline: 2px solid var(--fc-sky); outline-offset: 2px; }
+  .tab-panels { padding: 0; }
   .report-tab-panel[hidden] { display: none !important; }
-  .report-tab-panel h2 { font-size: 17px; font-weight: 700; margin-bottom: 20px;
-    border-bottom: 1px solid #e8e8ed; padding-bottom: 12px; color: #1d1d1f; }
-  .empty-msg { color: #555; font-style: italic; margin: 12px 0; }
-  .kpi-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-  .kpi { background: #f5f5f7; border-radius: 10px; padding: 16px 20px; min-width: 140px; flex: 1; }
+  .detail-panel { padding: 24px 28px 32px; }
+  .detail-panel > h2 {
+    font-size: 17px; font-weight: 700; margin-bottom: 20px;
+    border-bottom: 2px solid var(--fc-line); padding-bottom: 12px; color: var(--fc-dark);
+  }
+  .empty-msg { color: var(--fc-grey); font-style: italic; margin: 12px 0; }
+  .kpi-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 22px; }
+  .kpi {
+    background: linear-gradient(180deg, var(--fc-neutral) 0%, #e8eef6 100%);
+    border-radius: 12px; padding: 16px 18px; min-width: 130px; flex: 1;
+    border: 1px solid var(--fc-line);
+  }
   .kpi.wide { flex: 100%; }
-  .kpi-val { font-size: 18px; font-weight: 700; color: #1d1d1f; line-height: 1.35; }
-  .kpi-lbl { font-size: 12px; color: #666; margin-top: 4px; }
-  .chart-title { font-size: 15px; margin: 20px 0 12px; color: #333; }
-  .bar-chart { margin-bottom: 24px; }
+  .kpi-val { font-size: 18px; font-weight: 800; color: var(--fc-deep); line-height: 1.35; }
+  .kpi-lbl { font-size: 11px; color: var(--fc-grey); margin-top: 6px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .06em; }
+  .chart-title { font-size: 14px; font-weight: 700; margin: 22px 0 12px; color: var(--fc-dark); }
+  .bar-chart { margin-bottom: 22px; }
   .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
   .bar-label { flex: 0 0 200px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .bar-track { flex: 1; height: 22px; background: #e8e8ed; border-radius: 4px; overflow: hidden; }
-  .bar-fill { height: 100%; background: #0071b3; border-radius: 4px; min-width: 2px; }
-  .bar-val { flex: 0 0 48px; text-align: right; font-size: 13px; font-weight: 600; }
+  .bar-track {
+    flex: 1; height: 22px; background: var(--fc-neutral); border-radius: 6px;
+    overflow: hidden; border: 1px solid var(--fc-line);
+  }
+  .bar-fill {
+    height: 100%; border-radius: 5px; min-width: 3px;
+    background: linear-gradient(90deg, var(--fc-sky), var(--fc-blue));
+  }
+  .bar-val { flex: 0 0 48px; text-align: right; font-size: 13px; font-weight: 700; color: var(--fc-deep); }
   .table-wrap { overflow-x: auto; margin-top: 12px; }
   table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  table.data-table th, table.data-table td { border: 1px solid #e8e8ed; padding: 8px 10px; text-align: left; }
-  table.data-table th { background: #f5f5f7; font-weight: 600; }
-  .table-caption { font-size: 13px; color: #666; margin-bottom: 8px; }
-  .tag-list { margin: 12px 0 20px 20px; }
+  table.data-table th, table.data-table td { border: 1px solid var(--fc-line); padding: 8px 10px; text-align: left; }
+  table.data-table th {
+    background: linear-gradient(180deg, var(--fc-dark) 0%, var(--fc-deep) 100%);
+    color: #fff; font-weight: 600;
+  }
+  .table-caption { font-size: 13px; color: var(--fc-grey); margin-bottom: 8px; }
+  .tag-list { margin: 12px 0 20px 20px; color: var(--fc-text); }
   .ai-embed { overflow-x: auto; }
   .ai-embed pre { white-space: pre-wrap; word-break: break-word; }
-  .disclaimer { font-size: 12px; color: #666; margin-top: 20px; line-height: 1.5; }
-  .meta { font-size: 13px; color: #666; margin-top: 12px; }
+  .disclaimer { font-size: 12px; color: var(--fc-grey); margin-top: 20px; line-height: 1.5;
+    padding-top: 16px; border-top: 1px solid var(--fc-line); }
+  .meta { font-size: 13px; color: var(--fc-grey); margin-top: 12px; }
   .exec-metrics { margin: 12px 0 20px 20px; line-height: 1.7; list-style: disc; }
+  .detail-panel h3 { font-size: 15px; margin: 20px 0 10px; color: var(--fc-deep); }
+
+  /* Executive summary */
+  .exec-wrap { padding: 28px 28px 36px; }
+  .exec-head {
+    margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--fc-line);
+  }
+  .exec-head h2 { font-size: 20px; font-weight: 800; color: var(--fc-dark); letter-spacing: -0.03em; }
+  .exec-head p { margin-top: 8px; font-size: 14px; color: var(--fc-grey); max-width: 640px; }
+  .exec-mega {
+    background: linear-gradient(180deg, #f0f5fc 0%, var(--fc-neutral) 100%);
+    border-radius: 16px; border: 1px solid var(--fc-line); margin-bottom: 22px; overflow: hidden;
+  }
+  .exec-mega-inner--both {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch;
+  }
+  .exec-mega-inner--one { display: grid; grid-template-columns: 1fr; align-items: stretch; }
+  @media (max-width: 820px) {
+    .exec-mega-inner--both { grid-template-columns: 1fr; }
+    .exec-mega-divider { height: 1px; width: 100% !important; min-height: 0; }
+  }
+  .exec-mega-divider {
+    width: 1px;
+    background: linear-gradient(180deg, transparent, rgba(0,156,251,.35) 20%, rgba(90,0,255,.25) 80%, transparent);
+    min-height: 120px;
+  }
+  .exec-category { padding: 24px 20px 28px; text-align: center; }
+  .exec-category-wide .exec-tiles-center { max-width: 520px; }
+  .exec-category-title {
+    font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--fc-deep); margin-bottom: 18px;
+  }
+  .exec-tiles-center {
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: stretch; gap: 14px;
+    max-width: 420px; margin: 0 auto;
+  }
+  .exec-tile {
+    background: #fff; border-radius: 12px; padding: 18px 20px; border: 1px solid var(--fc-line);
+    box-shadow: 0 2px 14px rgba(0, 26, 71, 0.06);
+    flex: 0 1 200px; min-width: 168px; max-width: 240px; text-align: center;
+    transition: transform .12s, box-shadow .12s;
+  }
+  .exec-tile:hover { transform: translateY(-2px); box-shadow: var(--fc-glow-blue); }
+  .exec-tile-emphasis {
+    border-color: rgba(0, 156, 251, 0.35);
+    background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+  }
+  .exec-tile .val { font-size: 1.85rem; font-weight: 800; color: var(--fc-deep); letter-spacing: -0.02em; line-height: 1.15; }
+  .exec-tile-emphasis .val { font-size: 2rem; }
+  .exec-tile .lbl { margin-top: 10px; font-size: 12px; color: var(--fc-grey); font-weight: 600; line-height: 1.35; }
+  .exec-tile-warn .val { color: var(--fc-orange); }
+  .exec-tile-warn { border-left: 4px solid var(--fc-red); }
+  .exec-tile-timeline {
+    border-top: 3px solid var(--fc-violet); flex: 0 1 260px; max-width: 280px;
+  }
+  .exec-tile-timeline .val { font-size: 1.2rem; color: var(--fc-dark); font-weight: 800; }
+  .exec-of { font-weight: 600; font-size: 1rem; color: var(--fc-grey); }
+  .exec-ai-compact {
+    display: flex; flex-wrap: wrap; align-items: stretch; justify-content: center; gap: 16px;
+    max-width: 720px; margin: 0 auto;
+  }
+  .exec-hero-ai {
+    background: linear-gradient(145deg, var(--fc-deep) 0%, #1a0a5c 50%, var(--fc-dark) 100%);
+    color: #fff; border-radius: 14px; padding: 20px 24px 22px; box-shadow: var(--fc-glow-deep);
+    position: relative; overflow: hidden; flex: 1 1 280px; max-width: 380px;
+  }
+  .exec-hero-ai::before {
+    content: ""; position: absolute; top: -40%; right: -20%; width: 55%; height: 120%;
+    background: radial-gradient(circle, rgba(0, 237, 255, 0.15) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  .exec-hero-ai .eyebrow {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--fc-cyan); margin-bottom: 8px; position: relative; opacity: .95;
+  }
+  .exec-hero-ai .score-row {
+    display: flex; align-items: baseline; justify-content: center; gap: 8px; flex-wrap: wrap;
+    position: relative;
+  }
+  .exec-hero-ai .score-num {
+    font-size: clamp(2.25rem, 5vw, 2.85rem); font-weight: 800; line-height: 1;
+    letter-spacing: -0.04em; text-shadow: 0 2px 20px rgba(0, 237, 255, 0.25);
+  }
+  .exec-hero-ai .score-unit { font-size: 13px; font-weight: 600; opacity: .88; align-self: flex-end; padding-bottom: 6px; }
+  .exec-hero-ai .score-desc {
+    margin-top: 10px; font-size: 13px; font-weight: 500; line-height: 1.4; opacity: .92;
+    position: relative; text-align: center;
+  }
+  .exec-ai-stat {
+    background: #fff; border-radius: 14px; padding: 18px 22px; border: 1px solid var(--fc-line);
+    box-shadow: 0 4px 20px rgba(0, 26, 71, 0.06); border-left: 4px solid var(--fc-sky);
+    flex: 0 1 200px; min-width: 160px; max-width: 220px;
+    display: flex; flex-direction: column; justify-content: center; text-align: center;
+  }
+  .exec-ai-stat .eyebrow {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--fc-blue); margin-bottom: 8px;
+  }
+  .exec-ai-stat .val { font-size: 1.75rem; font-weight: 800; color: var(--fc-deep); }
+  .exec-ai-stat .lbl { margin-top: 6px; font-size: 12px; color: var(--fc-grey); line-height: 1.35; }
 """
 
     tab_script = """
