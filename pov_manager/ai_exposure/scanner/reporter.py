@@ -485,6 +485,94 @@ def _combined_remediation_section(asset_results: list, config: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Shared inner document (standalone page vs embedded integrated tab)
+# ---------------------------------------------------------------------------
+
+def _build_combined_report_container_inner_html(
+    asset_results: list,
+    combined: dict,
+) -> tuple[str, str]:
+    """
+    Build inner HTML for the main column (inside ``.container``).
+
+    Returns (combined_risk_color_hex, inner_html).
+    """
+    config = _load_config()
+    risk_color = combined.get("risk_color", "#555")
+    risk_label = combined.get("risk_label", "Unknown")
+    total_score = combined.get("total_score", 0)
+    finding_count = combined.get("finding_count", 0)
+    asset_count = combined.get("asset_count", len(asset_results))
+
+    sorted_results = sorted(
+        asset_results,
+        key=lambda r: r.get("score", {}).get("total_score", 0),
+        reverse=True,
+    )
+
+    asset_details_html = ""
+    for idx, r in enumerate(sorted_results):
+        asset_details_html += _asset_details_section(r, is_first=(idx == 0))
+
+    remediation_html = _combined_remediation_section(asset_results, config)
+
+    inner = f"""
+  <div class="score-card">
+    <div class="score-ring">
+      <div class="num">{total_score}</div>
+      <div class="lbl">Risk Score</div>
+    </div>
+    <div class="score-meta">
+      <h2>{_esc(risk_label)} Risk</h2>
+      <p>
+        Aggregated across <strong>{asset_count}</strong>
+        asset{'' if asset_count == 1 else 's'} with a combined total of
+        <strong>{finding_count}</strong>
+        finding{'' if finding_count == 1 else 's'}.
+        Risk level is driven by the highest-risk individual asset.
+      </p>
+    </div>
+  </div>
+
+  <section>
+    <h2>Asset Scorecard ({asset_count} asset{'' if asset_count == 1 else 's'})</h2>
+    {_asset_scorecard_table(asset_results)}
+  </section>
+
+  <section style="background:transparent;box-shadow:none;padding:0;margin-bottom:0">
+    <h2 style="padding:0 0 12px;border-bottom:none;margin-bottom:16px">
+      Per-Asset Findings
+    </h2>
+    {asset_details_html}
+  </section>
+
+  <section>
+    <h2>Remediation Guidance</h2>
+    {remediation_html}
+  </section>"""
+    return risk_color, inner
+
+
+def render_combined_report_embed_from_payload(payload: dict) -> str:
+    """
+    Scoped ``<style>`` plus ``.{AI_REPORT_ROOT_CLASS}`` body (no page header/footer)
+    for embedding in the integrated threat report.
+    """
+    asset_results = list(payload.get("assets") or [])
+    combined = payload.get("combined_score")
+    if not isinstance(combined, dict):
+        combined = {}
+    risk_color, inner = _build_combined_report_container_inner_html(
+        asset_results, combined
+    )
+    r = AI_REPORT_ROOT_CLASS
+    return (
+        f"<style>{_css(risk_color)}</style>\n"
+        f'<div class="{r}"><div class="container">{inner}\n</div></div>'
+    )
+
+
+# ---------------------------------------------------------------------------
 # Public API: generate_combined_report
 # ---------------------------------------------------------------------------
 
@@ -510,28 +598,10 @@ def generate_combined_report(
     -------
     output_path (str)
     """
-    config = _load_config()
-
-    risk_color = combined.get("risk_color", "#555")
-    risk_label = combined.get("risk_label", "Unknown")
-    total_score = combined.get("total_score", 0)
-    finding_count = combined.get("finding_count", 0)
-    asset_count = combined.get("asset_count", len(asset_results))
-
-    # Sort asset results by score descending (same order as scorecard)
-    sorted_results = sorted(
-        asset_results,
-        key=lambda r: r.get("score", {}).get("total_score", 0),
-        reverse=True,
+    risk_color, container_inner = _build_combined_report_container_inner_html(
+        asset_results, combined
     )
-
-    # Per-asset collapsible sections — first (highest risk) is open by default
-    asset_details_html = ""
-    for idx, r in enumerate(sorted_results):
-        asset_details_html += _asset_details_section(r, is_first=(idx == 0))
-
-    # Combined remediation (deduped)
-    remediation_html = _combined_remediation_section(asset_results, config)
+    asset_count = combined.get("asset_count", len(asset_results))
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -554,45 +624,7 @@ def generate_combined_report(
 </div>
 
 <div class="container">
-
-  <!-- Aggregate Risk Score -->
-  <div class="score-card">
-    <div class="score-ring">
-      <div class="num">{total_score}</div>
-      <div class="lbl">Risk Score</div>
-    </div>
-    <div class="score-meta">
-      <h2>{_esc(risk_label)} Risk</h2>
-      <p>
-        Aggregated across <strong>{asset_count}</strong>
-        asset{'' if asset_count == 1 else 's'} with a combined total of
-        <strong>{finding_count}</strong>
-        finding{'' if finding_count == 1 else 's'}.
-        Risk level is driven by the highest-risk individual asset.
-      </p>
-    </div>
-  </div>
-
-  <!-- Asset Scorecard -->
-  <section>
-    <h2>Asset Scorecard ({asset_count} asset{'' if asset_count == 1 else 's'})</h2>
-    {_asset_scorecard_table(asset_results)}
-  </section>
-
-  <!-- Per-Asset Detail Sections -->
-  <section style="background:transparent;box-shadow:none;padding:0;margin-bottom:0">
-    <h2 style="padding:0 0 12px;border-bottom:none;margin-bottom:16px">
-      Per-Asset Findings
-    </h2>
-    {asset_details_html}
-  </section>
-
-  <!-- Combined Remediation -->
-  <section>
-    <h2>Remediation Guidance</h2>
-    {remediation_html}
-  </section>
-
+{container_inner}
 </div>
 
 <footer>

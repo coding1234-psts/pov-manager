@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 import io
+import json
 import logging
 import os
 import re
@@ -17,10 +18,9 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 import pandas as pd
-from bs4 import BeautifulSoup
 from django.conf import settings
 
-from ai_exposure.scanner.reporter import AI_REPORT_ROOT_CLASS
+from ai_exposure.scanner.reporter import render_combined_report_embed_from_payload
 
 from vdr.models import ThreatProfile
 
@@ -99,46 +99,6 @@ def _normalize_email(s: Any) -> str | None:
         return None
     t = str(s).strip().lower()
     return t if t else None
-
-
-def _extract_ai_embed_for_integrated(ai_html: bytes) -> str:
-    """
-    Build embed HTML: scoped <style> from <head> plus the .ai-exposure-report subtree
-    when present. Legacy reports (no wrapper) embed body children only and omit
-    stylesheet so unscoped rules do not affect the integrated document.
-    """
-    text = ai_html.decode("utf-8", errors="replace")
-    try:
-        soup = BeautifulSoup(ai_html, "html.parser")
-    except Exception as e:
-        logger.warning("Could not parse AI HTML for embedding: %s", e)
-        return f"<pre>{html.escape(text)}</pre>"
-
-    style_chunks = re.findall(r"<style[^>]*>([\s\S]*?)</style>", text, flags=re.I)
-    combined_css = "\n".join(s.strip() for s in style_chunks if s and s.strip())
-
-    root = soup.select_one(f"div.{AI_REPORT_ROOT_CLASS}")
-    if root is not None:
-        frag = str(root)
-        if combined_css:
-            return f"<style>\n{combined_css}\n</style>\n{frag}"
-        logger.warning(
-            "AI exposure HTML has %s wrapper but no <style> blocks; layout may be wrong.",
-            AI_REPORT_ROOT_CLASS,
-        )
-        return frag
-
-    body = soup.body
-    if body:
-        inner = "".join(str(c) for c in body.children)
-        if inner.strip():
-            logger.info(
-                "AI exposure HTML has no div.%s; embedding body without stylesheet "
-                "(regenerate the AI report for full styling in the integrated view).",
-                AI_REPORT_ROOT_CLASS,
-            )
-        return inner
-    return soup.decode()
 
 
 def _bar_chart_html(
@@ -443,34 +403,46 @@ def _compute_executive_summary_metrics(
     return m
 
 
-def _parse_ai_exec_metrics_from_profile(
-    profile: ThreatProfile,
-) -> tuple[int | None, int | None]:
-    basename = (profile.ai_exposure_report_html or "").strip()
+def _load_ai_findings_payload(profile: ThreatProfile) -> dict[str, Any] | None:
+    basename = (profile.ai_exposure_findings_json or "").strip()
     if not basename or profile.ai_exposure_job_status != ThreatProfile.AI_EXPOSURE_JOB_READY:
-        return None, None
+        return None
     ai_path = os.path.join(settings.CTU_REPORTS_PATH, basename)
     if not os.path.isfile(ai_path):
-        return None, None
+        return None
     try:
-        with open(ai_path, "rb") as f:
-            raw = f.read()
-        soup = BeautifulSoup(raw, "html.parser")
-        root = soup.select_one(f"div.{AI_REPORT_ROOT_CLASS}") or soup
-        num_el = root.select_one(".score-ring .num")
-        score: int | None = None
-        if num_el:
-            t = num_el.get_text(strip=True)
-            if t.isdigit():
-                score = int(t)
-        rows = root.select("table.scorecard-table tbody tr")
-        n_assets = len(rows) if rows else None
+        with open(ai_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        logger.warning("Could not load AI findings JSON: %s", e)
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
+def _parse_ai_exec_metrics_from_payload(
+    payload: dict[str, Any],
+) -> tuple[int | None, int | None]:
+    combined = payload.get("combined_score")
+    if not isinstance(combined, dict):
+        combined = {}
+    ts = combined.get("total_score")
+    try:
+        if ts is None:
+            score: int | None = None
+        else:
+            score = int(round(float(ts)))
+    except (TypeError, ValueError):
+        score = None
+    assets = payload.get("assets")
+    if not isinstance(assets, list):
+        n_assets = None
+    else:
+        n_assets = len(assets)
         if n_assets == 0:
             n_assets = None
-        return score, n_assets
-    except Exception as e:
-        logger.warning("Could not parse AI metrics for executive summary: %s", e)
-        return None, None
+    return score, n_assets
 
 
 def _build_executive_summary_html(
@@ -750,24 +722,6 @@ def _section_leaked_credentials(
     return ("".join(parts), True)
 
 
-def _ai_tab_content(profile: ThreatProfile) -> tuple[str, bool]:
-    basename = (profile.ai_exposure_report_html or "").strip()
-    if not basename or profile.ai_exposure_job_status != ThreatProfile.AI_EXPOSURE_JOB_READY:
-        return ("", False)
-    ai_path = os.path.join(settings.CTU_REPORTS_PATH, basename)
-    if not os.path.isfile(ai_path):
-        return ("", False)
-    try:
-        with open(ai_path, "rb") as f:
-            raw = f.read()
-        inner = _extract_ai_embed_for_integrated(raw)
-    except OSError as e:
-        logger.warning("Could not read AI HTML: %s", e)
-        return ("", False)
-    body = f"<h2>AI exposure</h2><div class=\"ai-embed\">{inner}</div>"
-    return (body, True)
-
-
 def build_integrated_threat_report_html(
     profile: ThreatProfile,
     zip_path: str,
@@ -788,10 +742,23 @@ def build_integrated_threat_report_html(
         logger.exception("Integrated report zip read failed: %s", e)
         return None
 
-    ai_inner, show_ai = _ai_tab_content(profile)
-    if show_ai:
-        ascore, aassets = _parse_ai_exec_metrics_from_profile(profile)
+    ai_payload = _load_ai_findings_payload(profile)
+    show_ai = ai_payload is not None
+    ai_inner = ""
+    if ai_payload is not None:
+        ascore, aassets = _parse_ai_exec_metrics_from_payload(ai_payload)
         metrics = replace(metrics, ai_score=ascore, ai_asset_count=aassets)
+        try:
+            fragment = render_combined_report_embed_from_payload(ai_payload)
+            ai_inner = (
+                f"<h2>AI exposure</h2><div class=\"ai-embed\">{fragment}</div>"
+            )
+        except Exception as e:
+            logger.warning("AI embed from JSON failed: %s", e)
+            ai_inner = (
+                f"<h2>AI exposure</h2>"
+                f"<p class=\"empty-msg\">{html.escape(MSG_AI_UNAVAILABLE)}</p>"
+            )
 
     exec_inner = _build_executive_summary_html(metrics, profile)
 

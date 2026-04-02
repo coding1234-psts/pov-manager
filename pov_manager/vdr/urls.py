@@ -11,7 +11,6 @@ from .views import (
     export_threat_profiles_csv,
     cleanup_vdr_profile,
     get_se_emails_list,
-    download_ai_exposure_artifact,
     view_integrated_threat_report,
 )
 
@@ -41,12 +40,6 @@ urlpatterns = [
         'threat-profile/<str:threat_profile_unique_id>/integrated-report/',
         view_integrated_threat_report,
         name='view_integrated_threat_report',
-    ),
-
-    path(
-        'threat-profile/ai-exposure-download/<str:file_basename>',
-        download_ai_exposure_artifact,
-        name='download_ai_exposure_report',
     ),
 
     path(

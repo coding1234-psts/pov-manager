@@ -16,8 +16,6 @@ from ai_exposure.scanner.collector import collect
 from ai_exposure.scanner.secrets import scan as scan_secrets
 from ai_exposure.scanner.analyzer import analyze
 from ai_exposure.scanner.scorer import score, combined_score
-from ai_exposure.scanner.reporter import generate_combined_report
-
 from ai_exposure.powerpoint_summary import build_powerpoint_summary
 
 logger = logging.getLogger(__name__)
@@ -38,8 +36,8 @@ def run_ai_exposure_scan(
     """
     Run the full analyzer pipeline for *domain* (Threat Profile primary domain).
 
-    Writes HTML report + full findings JSON + compact PowerPoint-oriented JSON
-    under *output_dir* (typically ``settings.CTU_REPORTS_PATH``).
+    Writes full findings JSON + compact PowerPoint-oriented JSON under *output_dir*
+    (typically ``settings.CTU_REPORTS_PATH``).
 
     Parameters
     ----------
@@ -56,7 +54,7 @@ def run_ai_exposure_scan(
     -------
     dict with keys:
         ``payload`` — full scan structure (same shape as former API).
-        ``paths`` — ``html``, ``findings_json``, ``powerpoint_json`` absolute paths.
+        ``paths`` — ``findings_json``, ``powerpoint_json`` absolute paths.
         ``error`` — optional error string if scan aborted early.
     """
     out = Path(output_dir)
@@ -74,7 +72,6 @@ def run_ai_exposure_scan(
     prefix = file_prefix.strip() if file_prefix else _safe_name(target)
     base = f"{prefix}_ai_exposure_{ts}"
     findings_name = f"{base}_findings.json"
-    html_name = f"{base}_report.html"
     ppt_name = f"{base}_powerpoint.json"
 
     scan_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -102,19 +99,11 @@ def run_ai_exposure_scan(
                 "note": "no_live_assets_discovered",
             }
             (out / findings_name).write_text(json.dumps(payload, indent=2))
-            generate_combined_report(
-                domain=target,
-                asset_results=[],
-                combined=payload["combined_score"],
-                output_path=str(out / html_name),
-                scan_time=scan_time,
-            )
             summary = build_powerpoint_summary(payload)
             (out / ppt_name).write_text(json.dumps(summary, indent=2))
             return {
                 "payload": payload,
                 "paths": {
-                    "html": str(out / html_name),
                     "findings_json": str(out / findings_name),
                     "powerpoint_json": str(out / ppt_name),
                 },
@@ -166,20 +155,12 @@ def run_ai_exposure_scan(
         }
 
         (out / findings_name).write_text(json.dumps(payload, indent=2))
-        generate_combined_report(
-            domain=target,
-            asset_results=results,
-            combined=combined,
-            output_path=str(out / html_name),
-            scan_time=scan_time,
-        )
         summary = build_powerpoint_summary(payload)
         (out / ppt_name).write_text(json.dumps(summary, indent=2))
 
         return {
             "payload": payload,
             "paths": {
-                "html": str(out / html_name),
                 "findings_json": str(out / findings_name),
                 "powerpoint_json": str(out / ppt_name),
             },
