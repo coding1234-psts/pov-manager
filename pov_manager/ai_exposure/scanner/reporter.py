@@ -31,25 +31,6 @@ _TYPE_LABELS = {
     "open_storage_bucket": "Storage Bucket",
 }
 
-_CONF_COLORS = {
-    "high":   "#b30000",
-    "medium": "#b35c00",
-    "low":    "#2d7a2d",
-}
-
-_RISK_COLORS = {
-    "high":     "#b30000",
-    "moderate": "#b35c00",
-    "low":      "#2d7a2d",
-}
-
-_SOURCE_BADGE_COLORS = {
-    "root":          "#0071b3",   # cyan-blue
-    "homepage_link": "#2d7a2d",   # green
-    "crt.sh":        "#8a6d00",   # amber/yellow (dark enough for white text)
-    "dns_probe":     "#555555",   # gray
-}
-
 _TYPE_TO_REMEDIATION_KEY = {
     "missing_auth":         "public_ai_endpoint_no_auth",
     "open_api_docs":        "open_api_docs",
@@ -62,6 +43,62 @@ _TYPE_TO_REMEDIATION_KEY = {
 
 # Wrapper for scoped CSS so the report can be embedded in the integrated HTML doc.
 AI_REPORT_ROOT_CLASS = "ai-exposure-report"
+
+# v4-style pill classes (semantic); colors from scoped CSS for standalone reports.
+def _pill(bg_modifier: str, text: str) -> str:
+    return f'<span class="bg {bg_modifier}">{_esc(text)}</span>'
+
+
+def _confidence_to_bg_class(conf: str) -> str:
+    return {
+        "high": "bg--crit",
+        "medium": "bg--warn",
+        "low": "bg--ok",
+    }.get((conf or "medium").lower().strip(), "bg--muted")
+
+
+def _risk_level_to_bg_class(risk_level: str) -> str:
+    return {
+        "high": "bg--crit",
+        "moderate": "bg--warn",
+        "low": "bg--ok",
+    }.get((risk_level or "low").lower().strip(), "bg--muted")
+
+
+def _source_to_bg_class(source: str) -> str:
+    return {
+        "root": "bg--info",
+        "homepage_link": "bg--ok",
+        "crt.sh": "bg--warn",
+        "dns_probe": "bg--muted",
+    }.get((source or "").strip().lower(), "bg--muted")
+
+
+def _score_to_ring_dash_offset(total_score: object) -> str:
+    """SVG arc length 264; map score 0–100 to visible arc (cap at 100 for fill)."""
+    try:
+        s = float(total_score)
+    except (TypeError, ValueError):
+        s = 0.0
+    pct = max(0.0, min(100.0, s))
+    return f"{264.0 * (1.0 - pct / 100.0):.2f}"
+
+
+def _score_ring_gauge_html(total_score: object) -> str:
+    off = _score_to_ring_dash_offset(total_score)
+    return f"""    <div class="score-ring score-ring--gauge">
+      <svg class="score-gauge-svg" viewBox="0 0 104 104" aria-hidden="true">
+        <circle cx="52" cy="52" r="42" fill="none" stroke="#e5e5ea" stroke-width="5"/>
+        <circle class="gauge-ring" cx="52" cy="52" r="42" fill="none"
+          stroke="var(--ai-risk-color, #555)" stroke-width="5"
+          stroke-dasharray="264" stroke-dashoffset="{off}" stroke-linecap="round"
+          transform="rotate(-90 52 52)"/>
+      </svg>
+      <div class="score-ring-overlay">
+        <div class="num">{_esc(str(total_score))}</div>
+        <div class="lbl">Risk Score</div>
+      </div>
+    </div>"""
 
 
 # ---------------------------------------------------------------------------
@@ -105,14 +142,46 @@ def _css(combined_risk_color: str) -> str:
     margin-bottom: 28px; display: flex; align-items: center; gap: 40px;
     box-shadow: 0 1px 4px rgba(0,0,0,.08);
   }}
-  .{r} .score-ring {{
-    width: 110px; height: 110px; border-radius: 50%;
-    border: 8px solid {combined_risk_color};
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center; flex-shrink: 0;
+  .{r} .score-ring--gauge {{
+    position: relative;
+    width: 110px;
+    height: 110px;
+    flex-shrink: 0;
   }}
-  .{r} .score-ring .num {{ font-size: 32px; font-weight: 800; color: {combined_risk_color}; }}
-  .{r} .score-ring .lbl {{ font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; }}
+  .{r} .score-gauge-svg {{
+    display: block;
+    width: 110px;
+    height: 110px;
+    filter: drop-shadow(0 0 6px rgba(0,0,0,.06));
+  }}
+  .{r} .score-ring-overlay {{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }}
+  .{r} .score-ring-overlay .num {{
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--ai-risk-color, {combined_risk_color});
+    line-height: 1;
+  }}
+  .{r} .score-ring-overlay .lbl {{
+    font-size: 10px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 4px;
+  }}
+  .{r} .score-ring .gauge-ring {{
+    animation: aiExposureScoreRingIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }}
+  @keyframes aiExposureScoreRingIn {{
+    from {{ stroke-dashoffset: 264; }}
+  }}
   .{r} .score-meta h2 {{ font-size: 22px; font-weight: 700; color: {combined_risk_color}; margin-bottom: 8px; }}
   .{r} .score-meta p {{ color: #444; max-width: 640px; }}
 
@@ -139,11 +208,22 @@ def _css(combined_risk_color: str) -> str:
   .{r} .url {{ font-size: 12px; color: #555; word-break: break-all; }}
   .{r} .evidence {{ font-size: 12px; color: #333; max-width: 260px; }}
 
-  /* ---- Badges ---- */
-  .{r} .badge {{
-    display: inline-block; padding: 2px 10px; border-radius: 20px;
-    color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .4px;
+  /* ---- v4-style pills (standalone page; integrated host may override with theme tokens) ---- */
+  .{r} .bg {{
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
   }}
+  .{r} .bg--crit {{ background: rgba(179, 0, 0, 0.12); color: #b30000; }}
+  .{r} .bg--warn {{ background: rgba(179, 92, 0, 0.12); color: #b35c00; }}
+  .{r} .bg--ok {{ background: rgba(45, 122, 45, 0.12); color: #2d7a2d; }}
+  .{r} .bg--info {{ background: rgba(0, 113, 179, 0.12); color: #0071b3; }}
+  .{r} .bg--muted {{ background: rgba(85, 85, 85, 0.1); color: #555; }}
 
   /* ---- Scorecard table ---- */
   .{r} .scorecard-table th {{ white-space: nowrap; }}
@@ -239,11 +319,11 @@ def _findings_table(findings: list) -> str:
     rows = ""
     for f in findings:
         conf = f.get("confidence", "medium")
-        color = _CONF_COLORS.get(conf, "#555")
-        type_label = _TYPE_LABELS.get(f.get("type", ""), _esc(f.get("type", "")))
+        bg_cls = _confidence_to_bg_class(str(conf))
+        type_label = _TYPE_LABELS.get(f.get("type", ""), str(f.get("type", "")))
         rows += f"""
         <tr>
-          <td><span class="badge" style="background:{color}">{type_label}</span></td>
+          <td>{_pill(bg_cls, type_label)}</td>
           <td><strong>{_esc(f.get('name',''))}</strong></td>
           <td class="url">{_esc(f.get('source_url',''))}</td>
           <td class="evidence">{_esc(f.get('evidence',''))}</td>
@@ -265,10 +345,10 @@ def _secrets_table(secrets: list) -> str:
     rows = ""
     for s in secrets:
         conf = s.get("confidence", "medium")
-        color = _CONF_COLORS.get(conf, "#555")
+        bg_cls = _confidence_to_bg_class(str(conf))
         rows += f"""
         <tr>
-          <td><span class="badge" style="background:{color}">{_esc(conf.upper())}</span></td>
+          <td>{_pill(bg_cls, str(conf).upper())}</td>
           <td><strong>{_esc(s.get('credential_name',''))}</strong></td>
           <td class="url">{_esc(s.get('source_url',''))}</td>
           <td><code>{_esc(s.get('redacted_sample',''))}</code></td>
@@ -368,12 +448,13 @@ def _asset_scorecard_table(asset_results: list) -> str:
         hostname = _esc(asset.get("hostname", "unknown"))
         ip = _esc(asset.get("ip") or "—")
         source = asset.get("source", "")
-        source_color = _SOURCE_BADGE_COLORS.get(source, "#555")
-        source_label = _esc(source or "unknown")
+        src_cls = _source_to_bg_class(str(source))
+        source_label = source or "unknown"
 
         score_data = r.get("score", {})
-        risk_label = _esc(score_data.get("risk_label", "—"))
-        risk_color = score_data.get("risk_color", "#555")
+        risk_label = str(score_data.get("risk_label", "—"))
+        risk_level = str(score_data.get("risk_level", "low"))
+        risk_bg = _risk_level_to_bg_class(risk_level)
         total_score = score_data.get("total_score", 0)
         finding_count = score_data.get("finding_count", 0)
 
@@ -383,7 +464,7 @@ def _asset_scorecard_table(asset_results: list) -> str:
             <tr>
               <td><strong>{hostname}</strong></td>
               <td>{ip}</td>
-              <td><span class="badge" style="background:{source_color}">{source_label}</span></td>
+              <td>{_pill(src_cls, source_label)}</td>
               <td colspan="3" class="error-row">Scan failed: {_esc(str(error))}</td>
             </tr>"""
         else:
@@ -391,8 +472,8 @@ def _asset_scorecard_table(asset_results: list) -> str:
             <tr>
               <td><strong>{hostname}</strong></td>
               <td>{ip}</td>
-              <td><span class="badge" style="background:{source_color}">{source_label}</span></td>
-              <td><span class="badge" style="background:{risk_color}">{risk_label}</span></td>
+              <td>{_pill(src_cls, source_label)}</td>
+              <td>{_pill(risk_bg, risk_label)}</td>
               <td class="score-cell">{total_score}</td>
               <td class="findings-cell">{finding_count}</td>
             </tr>"""
@@ -419,8 +500,9 @@ def _asset_details_section(r: dict, is_first: bool) -> str:
     url = _esc(asset.get("url", ""))
 
     score_data = r.get("score", {})
-    risk_label = _esc(score_data.get("risk_label", "Unknown"))
-    risk_color = score_data.get("risk_color", "#555")
+    risk_label = str(score_data.get("risk_label", "Unknown"))
+    risk_level = str(score_data.get("risk_level", "low"))
+    risk_bg = _risk_level_to_bg_class(risk_level)
     total_score = score_data.get("total_score", 0)
     finding_count = score_data.get("finding_count", 0)
 
@@ -432,7 +514,7 @@ def _asset_details_section(r: dict, is_first: bool) -> str:
 
     summary_line = (
         f'<span class="summary-hostname">{hostname}</span>'
-        f'<span class="badge" style="background:{risk_color};margin-left:4px">{risk_label}</span>'
+        f'<span style="margin-left:4px">{_pill(risk_bg, risk_label)}</span>'
         f'<span class="summary-meta">&nbsp;&nbsp;{total_score} pts'
         f'&nbsp;|&nbsp;{finding_count} findings'
         f'&nbsp;|&nbsp;{len(secrets)} secrets</span>'
@@ -518,10 +600,7 @@ def _build_combined_report_container_inner_html(
 
     inner = f"""
   <div class="score-card">
-    <div class="score-ring">
-      <div class="num">{total_score}</div>
-      <div class="lbl">Risk Score</div>
-    </div>
+{_score_ring_gauge_html(total_score)}
     <div class="score-meta">
       <h2>{_esc(risk_label)} Risk</h2>
       <p>
@@ -556,8 +635,8 @@ def _build_combined_report_container_inner_html(
 def render_combined_report_embed_from_payload(payload: dict) -> str:
     """
     ``.{AI_REPORT_ROOT_CLASS}`` subtree (no page header/footer) for the integrated
-    threat report. The host document supplies FireComply-themed CSS; the root sets
-    ``--ai-risk-color`` for the score ring and headings.
+    threat report. The host document supplies theme CSS; the root sets
+    ``--ai-risk-color`` for the SVG score ring and headings.
     """
     asset_results = list(payload.get("assets") or [])
     combined = payload.get("combined_score")

@@ -14,7 +14,8 @@ import re
 import tempfile
 import zipfile
 from collections import Counter
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 import pandas as pd
@@ -22,12 +23,35 @@ from django.conf import settings
 
 from ai_exposure.scanner.reporter import render_combined_report_embed_from_payload
 
+from vdr.integrated_report_v4 import (
+    INTEGRATED_REPORT_V4_TAB_SCRIPT,
+    integrated_report_v4_stylesheet,
+)
 from vdr.models import ThreatProfile
 
 logger = logging.getLogger(__name__)
 
 SUFFIX_CREDENTIALS = "_credentials.xlsx"
 SUFFIX_SUSPICIOUS = "_suspicious_domains.xlsx"
+
+# Suspicious-domain risk_score bands (aligned with AI-style scoring on the same 0–100 scale).
+SD_RISK_MONITORED_MAX = 25
+SD_RISK_ELEVATED_MIN = 26
+SD_RISK_ELEVATED_MAX = 75
+SD_RISK_CRITICAL_MIN = 76
+
+
+def _sd_risk_severity_counts(rs: pd.Series) -> tuple[int, int, int]:
+    """Return (monitored ≤25, elevated 26–75, critical ≥76) for non-null risk scores."""
+    valid = rs.dropna()
+    if len(valid) == 0:
+        return (0, 0, 0)
+    monitored = int((valid <= SD_RISK_MONITORED_MAX).sum())
+    elevated = int(
+        ((valid >= SD_RISK_ELEVATED_MIN) & (valid <= SD_RISK_ELEVATED_MAX)).sum()
+    )
+    critical = int((valid >= SD_RISK_CRITICAL_MIN).sum())
+    return (monitored, elevated, critical)
 
 MSG_AI_UNAVAILABLE = (
     "An AI exposure assessment could not be included in this report."
@@ -61,6 +85,53 @@ class ExecutiveSummaryMetrics:
     lc_timeline: str | None = None
     ai_score: int | None = None
     ai_asset_count: int | None = None
+
+
+@dataclass
+class SdTabStats:
+    """Suspicious-domains tab: figures for badges, exec dash, and detail."""
+
+    row_count: int = 0
+    brand_roots: int = 0
+    max_rs: float | None = None
+    monitored: int = 0
+    elevated: int = 0
+    critical: int = 0
+    tag_variety: int = 0
+
+
+@dataclass
+class LcTabStats:
+    """Leaked-credentials tab: breach workbook summary for dash and badges."""
+
+    breach_rows: int = 0
+    distinct_emails: int = 0
+    distinct_breaches: int = 0
+    date_range: str = ""
+    year_bars: list[tuple[int, int]] = field(default_factory=list)
+    password_leak_rows: int = 0
+    exec_distinct_hit: int = 0
+    exec_den: int = 0
+    exec_breach_rows: int = 0
+    exec_pwd_rows: int = 0
+    discovered_email_note: str = ""
+
+
+@dataclass
+class AiDashStats:
+    """AI exposure JSON-derived counts for exec dash and tab badge."""
+
+    score: int = 0
+    assets: int = 0
+    high: int = 0
+    moderate: int = 0
+    low_active: int = 0
+    clean: int = 0
+    total_findings: int = 0
+    secrets: int = 0
+    with_findings: int = 0
+    risk_label: str = ""
+    risk_level: str = ""
 
 
 def integrated_report_zip_entry_name(report_id: str) -> str:
@@ -101,9 +172,48 @@ def _normalize_email(s: Any) -> str | None:
     return t if t else None
 
 
-def _bar_chart_html(
+def _sd_table_cell_str(v: Any) -> str:
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return ""
+    if hasattr(v, "strftime"):
+        try:
+            return v.strftime("%Y-%m-%d")
+        except (TypeError, ValueError, AttributeError):
+            pass
+    return str(v)
+
+
+def _v4_bars_html_peak_years(
     title: str,
     items: list[tuple[str, float]],
+    max_bars: int = 12,
+) -> str:
+    """Breaches-by-year style: tallest bar(s) use bf--red, others bf--violet."""
+    if not items:
+        return f'<p class="empty-msg">{html.escape(MSG_METRIC_NONE)}</p>'
+    items = items[:max_bars]
+    peak = max(v for _, v in items) or 1.0
+    max_v = peak
+    rows = []
+    for label, value in items:
+        pct = min(100.0, 100.0 * value / max_v)
+        fc = "bf--red" if value == peak and peak > 0 else "bf--violet"
+        lab_esc = html.escape(str(label)[:120])
+        rows.append(
+            f'<div class="bar"><div class="bar-lbl">{lab_esc}</div>'
+            f'<div class="bar-track"><div class="bar-fill {fc}" style="width:{pct:.1f}%"></div></div>'
+            f'<div class="bar-val">{html.escape(str(int(value) if value == int(value) else round(value, 2)))}</div></div>'
+        )
+    return (
+        f'<div class="shd">{html.escape(title)}</div>'
+        f'<div class="bars">{"".join(rows)}</div>'
+    )
+
+
+def _v4_bars_html(
+    title: str,
+    items: list[tuple[str, float]],
+    fill_class: str,
     max_bars: int = 10,
 ) -> str:
     if not items:
@@ -115,46 +225,99 @@ def _bar_chart_html(
         pct = min(100.0, 100.0 * value / max_v)
         lab_esc = html.escape(str(label)[:120])
         rows.append(
-            f'<div class="bar-row"><div class="bar-label">{lab_esc}</div>'
-            f'<div class="bar-track"><div class="bar-fill" style="width:{pct:.1f}%"></div></div>'
+            f'<div class="bar"><div class="bar-lbl">{lab_esc}</div>'
+            f'<div class="bar-track"><div class="bar-fill {fill_class}" style="width:{pct:.1f}%"></div></div>'
             f'<div class="bar-val">{html.escape(str(int(value) if value == int(value) else round(value, 2)))}</div></div>'
         )
     return (
-        f'<h3 class="chart-title">{html.escape(title)}</h3>'
-        f'<div class="bar-chart">{"".join(rows)}</div>'
+        f'<div class="shd">{html.escape(title)}</div>'
+        f'<div class="bars">{"".join(rows)}</div>'
     )
 
 
-def _kpi_card(label: str, value: str) -> str:
+def _v4_kpis_grid(
+    pairs: list[tuple[str, str]], crit_value_indices: set[int] | None = None
+) -> str:
+    crit_value_indices = crit_value_indices or set()
+    cells = []
+    for i, (val, lbl) in enumerate(pairs):
+        cn = " kpi-num--crit" if i in crit_value_indices else ""
+        cells.append(
+            f'<div class="kpi"><div class="kpi-num{cn}">{html.escape(val)}</div>'
+            f'<div class="kpi-txt">{html.escape(lbl)}</div></div>'
+        )
+    return f'<div class="kpis">{"".join(cells)}</div>'
+
+
+def _v4_risk_meter_cell(score_val: Any) -> str:
+    if score_val is None or (isinstance(score_val, float) and pd.isna(score_val)):
+        return '<span class="mono" style="color:var(--text-4)">—</span>'
+    try:
+        v = float(score_val)
+    except (TypeError, ValueError):
+        return html.escape(str(score_val)[:80])
+    pct = min(100.0, max(0.0, v))
+    if v >= SD_RISK_CRITICAL_MIN:
+        col = "var(--critical)"
+    elif v >= SD_RISK_ELEVATED_MIN:
+        col = "var(--warn)"
+    else:
+        col = "var(--blue)"
+    disp = int(v) if v == int(v) else round(v, 1)
     return (
-        f'<div class="kpi"><div class="kpi-val">{html.escape(value)}</div>'
-        f'<div class="kpi-lbl">{html.escape(label)}</div></div>'
+        f'<div class="rm"><div class="rm-track"><div class="rm-fill" style="width:{pct:.1f}%;background:{col}"></div></div>'
+        f'<span class="rm-val" style="color:{col}">{html.escape(str(disp))}</span></div>'
     )
 
 
-def _section_suspicious_domains(zipf: zipfile.ZipFile) -> tuple[str, bool]:
+def _v4_threat_tags_cell(raw: Any) -> str:
+    if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+        return '<span style="color:var(--text-4)">—</span>'
+    parts = [p.strip().lower() for p in re.split(r"[,;]", str(raw)) if p.strip()]
+    if not parts:
+        return '<span style="color:var(--text-4)">—</span>'
+    spans = []
+    for p in parts[:10]:
+        cls = (
+            "bg--crit"
+            if p in ("phishing", "malware")
+            else "bg--warn"
+            if p == "spam"
+            else "bg--info"
+        )
+        spans.append(f'<span class="bg {cls}">{html.escape(p)}</span>')
+    return " ".join(spans)
+
+
+def _section_suspicious_domains(
+    zipf: zipfile.ZipFile, profile: ThreatProfile
+) -> tuple[str, bool, SdTabStats | None]:
     """
-    Returns (panel inner HTML including h2, include_tab).
-    include_tab False if workbook missing/unreadable.
+    v4 card markup for the Suspicious Domains tab; stats for exec dash and tab badge.
     """
     member = _find_zip_member_by_suffix(zipf, SUFFIX_SUSPICIOUS)
     if not member:
-        return ("", False)
+        return ("", False, None)
 
     df = _read_excel_sheet(zipf, member, "Suspicious domains")
-    if df is None:
-        return ("", False)
-
-    if "domain" not in df.columns:
-        return ("", False)
+    if df is None or "domain" not in df.columns:
+        return ("", False, None)
 
     df = df.copy()
     df["_domain"] = df["domain"].astype(str).str.strip()
     df = df[df["_domain"].str.len() > 0]
 
+    org = html.escape(profile.organization_name or "organization")
+    sub_copy = f"Typosquat and lookalike domain monitoring for {org}."
+
     if len(df) == 0:
         inner = f'<p class="empty-msg">{html.escape(MSG_SUSPICIOUS_EMPTY)}</p>'
-        return (f"<h2>Suspicious domains</h2>{inner}", True)
+        card = (
+            f'<div class="card stagger">'
+            f'<div class="card-hd"><h2>Suspicious domains</h2><p>{sub_copy}</p></div>'
+            f'<div class="card-bd">{inner}</div></div>'
+        )
+        return (card, True, SdTabStats())
 
     rs = pd.to_numeric(df.get("risk_score"), errors="coerce")
     df["_rs"] = rs
@@ -162,7 +325,7 @@ def _section_suspicious_domains(zipf: zipfile.ZipFile) -> tuple[str, bool]:
     n_rows = len(df)
     orig = df.get("original_domain")
     if orig is not None:
-        n_brands = (
+        n_brands = int(
             orig.dropna()
             .astype(str)
             .str.strip()
@@ -174,38 +337,72 @@ def _section_suspicious_domains(zipf: zipfile.ZipFile) -> tuple[str, bool]:
         n_brands = 0
 
     max_rs = df["_rs"].max()
-    high_n = int((df["_rs"] >= 80).sum()) if df["_rs"].notna().any() else 0
+    mon_n, el_n, crit_n = _sd_risk_severity_counts(df["_rs"])
+    has_rs = bool(df["_rs"].notna().any())
+    max_rs_f: float | None = float(max_rs) if has_rs and pd.notna(max_rs) else None
 
-    kpis = [
-        _kpi_card("Total records", str(n_rows)),
-        _kpi_card("Distinct brand roots", str(int(n_brands))),
-    ]
-    if df["_rs"].notna().any():
-        max_val = float(max_rs)
-        max_display = (
-            str(int(max_val)) if max_val == int(max_val) else str(max_val)
-        )
-        kpis.append(_kpi_card("Max Risk Score", max_display))
-        kpis.append(_kpi_card("Records with risk ≥ 80", str(high_n)))
-    else:
-        kpis.append(
-            f'<div class="kpi wide"><p class="empty-msg">{html.escape(MSG_METRIC_NONE)}</p></div>'
-        )
-
-    threat_block = ""
+    tag_cnt: Counter[str] = Counter()
     if "risk_threat_profile" in df.columns:
-        tags: list[str] = []
         for cell in df["risk_threat_profile"].dropna().astype(str):
             for part in re.split(r"[,;]", cell):
                 t = part.strip().lower()
                 if t:
-                    tags.append(t)
-        if tags:
-            cnt = Counter(tags).most_common(12)
-            lis = "".join(f"<li>{html.escape(k)} ({v})</li>" for k, v in cnt)
-            threat_block = f'<h3>Threat profile tags</h3><ul class="tag-list">{lis}</ul>'
+                    tag_cnt[t] += 1
 
-    country_chart = ""
+    stats = SdTabStats(
+        row_count=n_rows,
+        brand_roots=n_brands,
+        max_rs=max_rs_f,
+        monitored=mon_n,
+        elevated=el_n,
+        critical=crit_n,
+        tag_variety=len(tag_cnt),
+    )
+
+    kpi_pairs: list[tuple[str, str]] = [
+        (str(n_rows), "Total records"),
+        (str(n_brands), "Brand roots"),
+    ]
+    crit_idx: set[int] = set()
+    if has_rs and max_rs_f is not None:
+        max_display = (
+            str(int(max_rs_f))
+            if max_rs_f == int(max_rs_f)
+            else str(round(max_rs_f, 2))
+        )
+        kpi_pairs.append((max_display, "Max risk score"))
+        kpi_pairs.append((str(crit_n), f"Risk ≥ {SD_RISK_CRITICAL_MIN}"))
+        crit_idx = {len(kpi_pairs) - 1}
+    kpis_html = _v4_kpis_grid(kpi_pairs, crit_idx)
+
+    sev_block = ""
+    if has_rs:
+        sev_block = _v4_bars_html(
+            "Risk severity distribution (risk score)",
+            [
+                (f"Monitored (≤ {SD_RISK_MONITORED_MAX})", float(mon_n)),
+                (
+                    f"Elevated ({SD_RISK_ELEVATED_MIN}–{SD_RISK_ELEVATED_MAX})",
+                    float(el_n),
+                ),
+                (f"Critical (≥ {SD_RISK_CRITICAL_MIN})", float(crit_n)),
+            ],
+            "bf--teal",
+            max_bars=3,
+        )
+
+    pills_block = ""
+    if tag_cnt:
+        top = tag_cnt.most_common(16)
+        pills = "".join(
+            f'<span class="pill">{html.escape(k)} <span class="pill-ct">{v}</span></span>'
+            for k, v in top
+        )
+        pills_block = (
+            f'<div class="shd">Threat profile tags</div><div class="pills">{pills}</div>'
+        )
+
+    country_block = ""
     if "country" in df.columns:
         c = (
             df["country"]
@@ -217,17 +414,18 @@ def _section_suspicious_domains(zipf: zipfile.ZipFile) -> tuple[str, bool]:
         )
         if len(c):
             vc = c.value_counts().head(10)
-            country_chart = _bar_chart_html(
+            country_block = _v4_bars_html(
                 "Top countries (record count)",
                 list(zip(vc.index.tolist(), vc.values.tolist())),
+                "bf--teal",
             )
         else:
-            country_chart = f'<p class="empty-msg">{html.escape(MSG_METRIC_NONE)}</p>'
+            country_block = f'<p class="empty-msg">{html.escape(MSG_METRIC_NONE)}</p>'
 
     sort_df = df.sort_values("_rs", ascending=False, na_position="last")
     show_n = len(sort_df) if len(sort_df) <= 10 else 10
     sub = sort_df.head(show_n)
-    cols = [
+    col_keys = [
         c
         for c in (
             "domain",
@@ -240,33 +438,54 @@ def _section_suspicious_domains(zipf: zipfile.ZipFile) -> tuple[str, bool]:
         )
         if c in sub.columns
     ]
-    thead = "<tr>" + "".join(f"<th>{html.escape(c)}</th>" for c in cols) + "</tr>"
+    th_labels = {
+        "domain": "Domain",
+        "original_domain": "Original",
+        "risk_score": "Risk",
+        "risk_threat_profile": "Threat",
+        "create_date": "Created",
+        "country": "Country",
+        "registrar": "Registrar",
+    }
+    thead = "<tr>" + "".join(
+        f"<th>{html.escape(th_labels.get(c, c))}</th>" for c in col_keys
+    ) + "</tr>"
     trs = []
     for _, row in sub.iterrows():
         tds = []
-        for c in cols:
+        for c in col_keys:
             v = row.get(c)
-            if pd.isna(v):
-                s = ""
+            if c == "risk_score":
+                inner = _v4_risk_meter_cell(v)
+            elif c == "risk_threat_profile":
+                inner = _v4_threat_tags_cell(v)
+            elif c == "domain":
+                s = _sd_table_cell_str(v)
+                inner = f"<strong>{html.escape(s[:500])}</strong>" if s else ""
             else:
-                s = str(v)
-            tds.append(f"<td>{html.escape(s[:500])}</td>")
+                s = _sd_table_cell_str(v)
+                inner = html.escape(s[:500]) if s else ""
+            tds.append(f"<td>{inner}</td>")
         trs.append("<tr>" + "".join(tds) + "</tr>")
-    caption = (
+    cap = (
         "All records sorted by risk score."
         if len(sort_df) <= 10
         else "Ten highest-risk domains (by risk score)."
     )
     table_html = (
-        f'<h3>Domain detail</h3><p class="table-caption">{html.escape(caption)}</p>'
-        f'<div class="table-wrap"><table class="data-table">{thead}<tbody>{"".join(trs)}</tbody></table></div>'
+        f'<div class="shd">Highest-risk domains</div>'
+        f'<p class="tcap">{html.escape(cap)}</p>'
+        f'<div class="tw"><table class="dt"><thead>{thead}</thead>'
+        f'<tbody>{"".join(trs)}</tbody></table></div>'
     )
 
-    body = (
-        f'<div class="kpi-row">{"".join(kpis)}</div>'
-        f"{threat_block}{country_chart}{table_html}"
+    body = f"{kpis_html}{sev_block}{pills_block}{country_block}{table_html}"
+    card = (
+        f'<div class="card stagger">'
+        f'<div class="card-hd"><h2>Suspicious domains</h2><p>{sub_copy}</p></div>'
+        f'<div class="card-bd">{body}</div></div>'
     )
-    return (f"<h2>Suspicious domains</h2>{body}", True)
+    return (card, True, stats)
 
 
 def _split_data_leaked_categories(series: pd.Series) -> Counter:
@@ -352,9 +571,9 @@ def _compute_executive_summary_metrics(
                 rs = pd.to_numeric(dfc.get("risk_score"), errors="coerce")
                 dfc["_rs"] = rs
                 if dfc["_rs"].notna().any():
-                    high_n = int((dfc["_rs"] >= 80).sum())
-                    if high_n > 0:
-                        m.sd_high_risk = high_n
+                    _, _, crit_n = _sd_risk_severity_counts(dfc["_rs"])
+                    if crit_n > 0:
+                        m.sd_high_risk = crit_n
 
     # —— Leaked credentials ——
     member_lc = _find_zip_member_by_suffix(zipf, SUFFIX_CREDENTIALS)
@@ -445,281 +664,618 @@ def _parse_ai_exec_metrics_from_payload(
     return score, n_assets
 
 
-def _build_executive_summary_html(
-    metrics: ExecutiveSummaryMetrics,
-    profile: ThreatProfile,
-) -> str:
-    parts: list[str] = []
-    parts.append('<div class="exec-wrap">')
-    parts.append('<div class="exec-head">')
-    parts.append("<h2>Executive Summary</h2>")
-    parts.append(
-        "<p>Priority indicators from available assessments in this bundle. "
-        "Figures appear only when qualifying data exists.</p>"
+def _css_id_safe(s: str) -> str:
+    t = re.sub(r"[^a-zA-Z0-9_-]+", "_", (s or "rpt").strip())
+    return (t[:56] or "rpt").strip("_") or "rpt"
+
+
+def _gauge_ring_offset(score: int) -> str:
+    c = 264.0
+    sc = max(0, min(100, int(score)))
+    return f"{c * (1.0 - sc / 100.0):.2f}"
+
+
+def _ai_dash_from_payload(payload: dict[str, Any] | None) -> AiDashStats | None:
+    if not payload or not isinstance(payload, dict):
+        return None
+    combined = payload.get("combined_score") or {}
+    if not isinstance(combined, dict):
+        combined = {}
+    try:
+        score = int(round(float(combined.get("total_score") or 0)))
+    except (TypeError, ValueError):
+        score = 0
+    risk_label = str(combined.get("risk_label") or "").strip()
+    risk_level = str(combined.get("risk_level") or "").strip().lower()
+    assets = payload.get("assets")
+    if not isinstance(assets, list):
+        return AiDashStats(score=score, risk_label=risk_label, risk_level=risk_level)
+    high = mod = low_a = clean = 0
+    total_findings = secrets = 0
+    with_findings = 0
+    for block in assets:
+        if not isinstance(block, dict):
+            continue
+        sc = block.get("score") or {}
+        if not isinstance(sc, dict):
+            sc = {}
+        rl = (sc.get("risk_level") or "low").lower()
+        finds = block.get("findings") or []
+        secs = block.get("secrets") or []
+        if not isinstance(finds, list):
+            finds = []
+        if not isinstance(secs, list):
+            secs = []
+        fc = len(finds)
+        total_findings += fc
+        secrets += len(secs)
+        has = fc > 0 or len(secs) > 0
+        if has:
+            with_findings += 1
+        if rl == "high":
+            high += 1
+        elif rl == "moderate":
+            mod += 1
+        elif rl == "low":
+            if has:
+                low_a += 1
+            else:
+                clean += 1
+        else:
+            clean += 1
+    return AiDashStats(
+        score=score,
+        assets=len(assets),
+        high=high,
+        moderate=mod,
+        low_active=low_a,
+        clean=clean,
+        total_findings=total_findings,
+        secrets=secrets,
+        with_findings=with_findings,
+        risk_label=risk_label,
+        risk_level=risk_level,
     )
-    parts.append("</div>")
 
-    sd_tiles: list[str] = []
-    if metrics.sd_typosquat is not None:
-        v = html.escape(str(metrics.sd_typosquat))
-        sd_tiles.append(
-            f'<div class="exec-tile"><div class="val">{v}</div>'
-            f'<div class="lbl">Typosquat-related domain records</div></div>'
+
+def _ai_exposure_hero_risk_title(risk_level: str, risk_label: str) -> str:
+    """
+    v4-style title fragment after em dash, e.g. "High Risk", "Moderate Risk".
+    Prefers combined_score.risk_level; falls back to risk_label + " Risk".
+    """
+    lv = (risk_level or "").lower().strip()
+    by_level = {
+        "high": "High Risk",
+        "moderate": "Moderate Risk",
+        "low": "Low Risk",
+    }
+    if lv in by_level:
+        return by_level[lv]
+    lab = (risk_label or "").strip()
+    if not lab:
+        return "Unknown Risk"
+    low = lab.lower()
+    if low.endswith(" risk"):
+        return " ".join(w.capitalize() for w in lab.split())
+    return f"{lab} Risk"
+
+
+def _pct_part(n: int, total: int) -> float:
+    if total <= 0:
+        return 0.0
+    return max(0.0, min(100.0, 100.0 * n / total))
+
+
+def _build_exec_panel_v4(
+    profile: ThreatProfile,
+    report_id: str,
+    sd: SdTabStats | None,
+    lc: LcTabStats | None,
+    ai: AiDashStats | None,
+    *,
+    show_sd: bool,
+    show_lc: bool,
+    show_ai: bool,
+) -> str:
+    """Executive Summary tab: v4 hero row + three dashboard cards."""
+    sid = _css_id_safe(report_id)
+    gid_ai = f"{sid}_gai"
+    parts: list[str] = []
+
+    hero_cells: list[str] = []
+    has_ai_hero = bool(ai is not None and show_ai)
+    has_sd = bool(sd and show_sd and sd.row_count > 0)
+
+    if has_ai_hero and ai is not None:
+        off = _gauge_ring_offset(min(100, max(0, int(ai.score))))
+        risk_title = _ai_exposure_hero_risk_title(ai.risk_level, ai.risk_label)
+        ai_intro = (
+            f"Composite score across {html.escape(str(ai.assets))} assessed assets. "
+            if ai.assets > 0
+            else "Composite AI exposure score from the latest findings payload. "
         )
-    if metrics.sd_high_risk is not None:
-        v = html.escape(str(metrics.sd_high_risk))
-        sd_tiles.append(
-            f'<div class="exec-tile exec-tile-warn"><div class="val">{v}</div>'
-            f'<div class="lbl">Records with risk score ≥ 80</div></div>'
+        ai_para = (
+            "<p>"
+            + ai_intro
+            + "Reflects public attack-surface findings from the AI exposure assessment.</p>"
+        )
+        hero_cells.append(
+            f'<div class="hero hero--primary">'
+            f'<div class="gauge">'
+            f'<svg viewBox="0 0 104 104" aria-hidden="true">'
+            f'<circle cx="52" cy="52" r="42" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="5"/>'
+            f'<circle class="gauge-ring" cx="52" cy="52" r="42" fill="none" '
+            f'stroke="url(#{gid_ai})" stroke-width="5" stroke-dasharray="264" '
+            f'stroke-dashoffset="{off}" stroke-linecap="round" transform="rotate(-90 52 52)"/>'
+            f'<defs><linearGradient id="{gid_ai}" x1="0" y1="0" x2="1" y2="1">'
+            f'<stop offset="0%" stop-color="#14B8A6"/><stop offset="100%" stop-color="#60A5FA"/>'
+            f"</linearGradient></defs></svg>"
+            f'<div class="gauge-center">'
+            f'<div class="gauge-num" style="color:var(--accent)">{html.escape(str(ai.score))}</div>'
+            f'<div class="gauge-label" style="color:var(--text-4)">Score</div></div></div>'
+            f'<div class="hero-text"><h3>AI Exposure — {html.escape(risk_title)}</h3>'
+            f"{ai_para}"
+            f"</div></div>"
+        )
+        if has_sd and sd is not None:
+            vis = 264.0 * max(
+                0.08, min(0.95, (sd.critical * 2.5) / max(sd.row_count, 1))
+            )
+            sd_off = f"{264.0 - vis:.2f}"
+            hero_cells.append(
+                f'<div class="hero hero--secondary">'
+                f'<div class="gauge">'
+                f'<svg viewBox="0 0 104 104" aria-hidden="true">'
+                f'<circle cx="52" cy="52" r="42" fill="none" stroke="var(--surface-2)" stroke-width="5"/>'
+                f'<circle class="gauge-ring--partial" cx="52" cy="52" r="42" fill="none" '
+                f'stroke="var(--critical)" stroke-width="5" stroke-dasharray="264" '
+                f'stroke-dashoffset="{sd_off}" stroke-linecap="round" transform="rotate(-90 52 52)"/>'
+                f"</svg>"
+                f'<div class="gauge-center">'
+                f'<div class="gauge-num" style="color:var(--critical)">{html.escape(str(sd.critical))}</div>'
+                f'<div class="gauge-label" style="color:var(--text-4)">Critical</div></div></div>'
+                f'<div class="hero-text"><h3>High-Risk Domains Detected</h3>'
+                f"<p>{html.escape(str(sd.critical))} of {html.escape(str(sd.row_count))} typosquat-related "
+                f"records scored ≥ {SD_RISK_CRITICAL_MIN} on risk score.</p>"
+                f"</div></div>"
+            )
+    elif has_sd and sd is not None:
+        vis = 264.0 * max(
+            0.1, min(0.95, (sd.critical * 2.5) / max(sd.row_count, 1))
+        )
+        sd_off = f"{264.0 - vis:.2f}"
+        hero_cells.append(
+            f'<div class="hero hero--primary" style="grid-column:1/-1">'
+            f'<div class="gauge">'
+            f'<svg viewBox="0 0 104 104" aria-hidden="true">'
+            f'<circle cx="52" cy="52" r="42" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="5"/>'
+            f'<circle class="gauge-ring--partial" cx="52" cy="52" r="42" fill="none" '
+            f'stroke="var(--critical)" stroke-width="5" stroke-dasharray="264" '
+            f'stroke-dashoffset="{sd_off}" stroke-linecap="round" transform="rotate(-90 52 52)"/>'
+            f"</svg>"
+            f'<div class="gauge-center">'
+            f'<div class="gauge-num" style="color:var(--accent)">{html.escape(str(sd.row_count))}</div>'
+            f'<div class="gauge-label" style="color:var(--text-4)">Records</div></div></div>'
+            f'<div class="hero-text"><h3>Suspicious Domain Surface</h3>'
+            f"<p>{html.escape(str(sd.row_count))} typosquat-related records; "
+            f"{html.escape(str(sd.critical))} at or above critical threshold "
+            f"(≥ {SD_RISK_CRITICAL_MIN}).</p>"
+            f"</div></div>"
         )
 
-    lc_tiles: list[str] = []
-    if metrics.lc_distinct_accounts is not None:
-        v = html.escape(str(metrics.lc_distinct_accounts))
-        lc_tiles.append(
-            f'<div class="exec-tile exec-tile-emphasis"><div class="val">{v}</div>'
-            f'<div class="lbl">Distinct accounts with breach exposure</div></div>'
-        )
-    if metrics.lc_exec_num is not None and metrics.lc_exec_den is not None:
-        num_e = html.escape(str(metrics.lc_exec_num))
-        den_e = html.escape(str(metrics.lc_exec_den))
-        lc_tiles.append(
-            f'<div class="exec-tile exec-tile-emphasis exec-tile-warn">'
-            f'<div class="val">{num_e} <span class="exec-of">of</span> {den_e}</div>'
-            f'<div class="lbl">Executive accounts with exposure (in-scope)</div></div>'
-        )
-    if metrics.lc_timeline is not None:
-        v = html.escape(metrics.lc_timeline)
-        lc_tiles.append(
-            f'<div class="exec-tile exec-tile-timeline"><div class="val">{v}</div>'
-            f'<div class="lbl">Breach activity time span</div></div>'
-        )
-
-    show_sd_col = len(sd_tiles) > 0
-    show_lc_col = len(lc_tiles) > 0
-
-    if show_sd_col or show_lc_col:
-        mega_mod = (
-            " exec-mega-inner--both"
-            if show_sd_col and show_lc_col
-            else " exec-mega-inner--one"
-        )
+    if hero_cells:
+        grid_style = ""
+        if len(hero_cells) == 1 and has_ai_hero:
+            grid_style = ' style="grid-template-columns:1fr"'
         parts.append(
-            f'<div class="exec-mega"><div class="exec-mega-inner{mega_mod}">'
+            f'<div class="hero-row stagger"{grid_style}>{"".join(hero_cells)}</div>'
         )
-        if show_sd_col:
-            parts.append('<div class="exec-category">')
-            parts.append(
-                '<div class="exec-category-title">Suspicious domains</div>'
-                f'<div class="exec-tiles-center">{"".join(sd_tiles)}</div>'
-            )
-            parts.append("</div>")
-        if show_sd_col and show_lc_col:
-            parts.append('<div class="exec-mega-divider" aria-hidden="true"></div>')
-        if show_lc_col:
-            parts.append('<div class="exec-category exec-category-wide">')
-            parts.append(
-                '<div class="exec-category-title">Leaked credentials</div>'
-                f'<div class="exec-tiles-center">{"".join(lc_tiles)}</div>'
-            )
-            parts.append("</div>")
-        parts.append("</div></div>")
 
-    ai_parts: list[str] = []
-    if metrics.ai_score is not None or metrics.ai_asset_count is not None:
-        ai_parts.append('<div class="exec-ai-compact">')
-        if metrics.ai_score is not None:
-            score_html = html.escape(str(metrics.ai_score))
-            ai_parts.append(
-                '<div class="exec-hero-ai">'
-                '<div class="eyebrow">AI exposure</div>'
-                '<div class="score-row">'
-                f'<span class="score-num">{score_html}</span>'
-                '<span class="score-unit">/ 100</span></div>'
-                "<p class=\"score-desc\">Overall AI exposure score — composite of assessed "
-                "public attack surface.</p></div>"
+    dash_cards: list[str] = []
+
+    if show_sd and sd is not None:
+        tot_sd = max(1, sd.monitored + sd.elevated + sd.critical)
+        p_crit = _pct_part(sd.critical, tot_sd)
+        p_el = _pct_part(sd.elevated, tot_sd)
+        p_mon = max(0.0, 100.0 - p_crit - p_el)
+        mx = (
+            "—"
+            if sd.max_rs is None
+            else (
+                str(int(sd.max_rs))
+                if sd.max_rs == int(sd.max_rs)
+                else str(round(float(sd.max_rs), 1))
             )
-        if metrics.ai_asset_count is not None:
-            assets_html = html.escape(str(metrics.ai_asset_count))
-            ai_parts.append(
-                '<div class="exec-ai-stat">'
-                '<div class="eyebrow">Attack surface</div>'
-                f'<div class="val">{assets_html}</div>'
-                '<div class="lbl">Assets assessed (URLs / hostnames in scope)</div>'
-                "</div>"
+        )
+        dash_cards.append(
+            f'<div class="dash-card dash-card--domains">'
+            f'<div class="dash-header">'
+            f'<div class="dash-title">Suspicious domains</div>'
+            f'<div class="dash-icon dash-icon--domains">'
+            f'<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+            f'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>'
+            f'<path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>'
+            f"</svg></div></div>"
+            f'<div class="dash-hero-num">{html.escape(str(sd.row_count))}</div>'
+            f'<div class="dash-hero-label">Typosquat-related domain records</div>'
+            f'<div class="dash-severity">'
+            f'<div class="dash-sev-seg" style="width:{p_crit:.1f}%;background:var(--critical)"></div>'
+            f'<div class="dash-sev-seg" style="width:{p_el:.1f}%;background:var(--warn)"></div>'
+            f'<div class="dash-sev-seg" style="width:{p_mon:.1f}%;background:var(--accent)"></div>'
+            f"</div>"
+            f'<div class="dash-sev-legend">'
+            f'<span class="dash-sev-item"><span class="dash-sev-dot" style="background:var(--critical)"></span>'
+            f'Critical {html.escape(str(sd.critical))}</span>'
+            f'<span class="dash-sev-item"><span class="dash-sev-dot" style="background:var(--warn)"></span>'
+            f'Elevated {html.escape(str(sd.elevated))}</span>'
+            f'<span class="dash-sev-item"><span class="dash-sev-dot" style="background:var(--accent)"></span>'
+            f'Monitored {html.escape(str(sd.monitored))}</span>'
+            f"</div>"
+            f'<div class="dash-stats">'
+            f"<div><div class=\"dash-stat-num dash-stat-num--crit\">"
+            f'{html.escape(str(sd.critical))}</div>'
+            f'<div class="dash-stat-label">Risk ≥ {SD_RISK_CRITICAL_MIN}</div></div>'
+            f'<div><div class="dash-stat-num">{html.escape(mx)}</div>'
+            f'<div class="dash-stat-label">Max risk score</div></div>'
+            f'<div><div class="dash-stat-num">{html.escape(str(sd.tag_variety))}</div>'
+            f'<div class="dash-stat-label">Threat tag types</div></div>'
+            f'<div><div class="dash-stat-num">{html.escape(str(sd.brand_roots))}</div>'
+            f'<div class="dash-stat-label">Brand roots</div></div>'
+            f"</div></div>"
+        )
+
+    if show_lc and lc is not None:
+        mini_inner, mini_leg = _lc_mini_bars_markup(lc.year_bars)
+        mini_block = ""
+        if mini_inner:
+            mini_block = (
+                f'<div class="dash-mini-bars">{mini_inner}</div>'
+                f'<div class="dash-mini-legend">{mini_leg}</div>'
             )
-        ai_parts.append("</div>")
-    parts.append("".join(ai_parts))
-    parts.append("</div>")
+        exec_cell = "—"
+        if lc.exec_den > 0 and lc.exec_distinct_hit > 0:
+            exec_cell = (
+                f'{html.escape(str(lc.exec_distinct_hit))} '
+                f'<span style="font-size:12px;color:var(--text-4);font-weight:500">of</span> '
+                f"{html.escape(str(lc.exec_den))}"
+            )
+        elif lc.exec_den > 0:
+            exec_cell = f"0 <span style=\"font-size:12px;color:var(--text-4);font-weight:500\">of</span> {html.escape(str(lc.exec_den))}"
+        hero_lc = str(lc.distinct_emails) if lc.distinct_emails > 0 else str(lc.breach_rows)
+        dash_cards.append(
+            f'<div class="dash-card dash-card--creds">'
+            f'<div class="dash-header">'
+            f'<div class="dash-title">Leaked credentials</div>'
+            f'<div class="dash-icon dash-icon--creds">'
+            f'<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+            f'<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>'
+            f'<path d="M7 11V7a5 5 0 0110 0v4"/></svg></div></div>'
+            f'<div class="dash-hero-num">{html.escape(hero_lc)}</div>'
+            f'<div class="dash-hero-label">Distinct accounts with breach exposure</div>'
+            f"{mini_block}"
+            f'<div class="dash-stats">'
+            f'<div><div class="dash-stat-num">{html.escape(str(lc.breach_rows))}</div>'
+            f'<div class="dash-stat-label">Breach incidents</div></div>'
+            f'<div><div class="dash-stat-num">{html.escape(str(lc.distinct_breaches))}</div>'
+            f'<div class="dash-stat-label">Breach sources</div></div>'
+            f'<div><div class="dash-stat-num dash-stat-num--crit">{exec_cell}</div>'
+            f'<div class="dash-stat-label">Exec. exposed</div></div>'
+            f'<div><div class="dash-stat-num">{html.escape(str(lc.password_leak_rows))}</div>'
+            f'<div class="dash-stat-label">Password leaks</div></div>'
+            f"</div></div>"
+        )
+
+    if show_ai and ai is not None:
+        t_ai = max(1, ai.high + ai.moderate + ai.low_active + ai.clean)
+        dash_cards.append(
+            f'<div class="dash-card dash-card--ai">'
+            f'<div class="dash-header">'
+            f'<div class="dash-title">AI Exposure</div>'
+            f'<div class="dash-icon dash-icon--ai">'
+            f'<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+            f'<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>'
+            f"</svg></div></div>"
+            f'<div class="dash-hero-num" style="color:var(--blue)">{html.escape(str(ai.score))}</div>'
+            f'<div class="dash-hero-label">Overall AI Exposure score</div>'
+            f'<div class="dash-severity">'
+            f'<div class="dash-sev-seg" style="width:{_pct_part(ai.high, t_ai):.1f}%;background:var(--critical)"></div>'
+            f'<div class="dash-sev-seg" style="width:{_pct_part(ai.moderate, t_ai):.1f}%;background:var(--warn)"></div>'
+            f'<div class="dash-sev-seg" style="width:{_pct_part(ai.low_active, t_ai):.1f}%;background:var(--blue)"></div>'
+            f'<div class="dash-sev-seg" style="width:{_pct_part(ai.clean, t_ai):.1f}%;background:var(--ok)"></div>'
+            f"</div>"
+            f'<div class="dash-sev-legend">'
+            f'<span class="dash-sev-item"><span class="dash-sev-dot" style="background:var(--critical)"></span>'
+            f'High {html.escape(str(ai.high))}</span>'
+            f'<span class="dash-sev-item"><span class="dash-sev-dot" style="background:var(--warn)"></span>'
+            f'Moderate {html.escape(str(ai.moderate))}</span>'
+            f'<span class="dash-sev-item"><span class="dash-sev-dot" style="background:var(--blue)"></span>'
+            f'Low {html.escape(str(ai.low_active))}</span>'
+            f'<span class="dash-sev-item"><span class="dash-sev-dot" style="background:var(--ok)"></span>'
+            f'Clean {html.escape(str(ai.clean))}</span>'
+            f"</div>"
+            f'<div class="dash-stats">'
+            f'<div><div class="dash-stat-num">{html.escape(str(ai.assets))}</div>'
+            f'<div class="dash-stat-label">Assets assessed</div></div>'
+            f'<div><div class="dash-stat-num">{html.escape(str(ai.total_findings))}</div>'
+            f'<div class="dash-stat-label">Total findings</div></div>'
+            f'<div><div class="dash-stat-num dash-stat-num--crit">{html.escape(str(ai.secrets))}</div>'
+            f'<div class="dash-stat-label">Exposed secrets</div></div>'
+            f'<div><div class="dash-stat-num">{html.escape(str(ai.with_findings))}</div>'
+            f'<div class="dash-stat-label">With findings</div></div>'
+            f"</div></div>"
+        )
+
+    if dash_cards:
+        parts.append(f'<div class="dash-grid stagger">{"".join(dash_cards)}</div>')
+
+    if not parts:
+        org = html.escape(profile.organization_name or "")
+        return (
+            f'<p class="empty-msg">No executive dashboard metrics are available for {org} '
+            f"in this bundle.</p>"
+        )
     return "".join(parts)
+
+
+def _lc_mini_bars_markup(
+    year_bars: list[tuple[int, int]],
+) -> tuple[str, str]:
+    """Returns (inner HTML for .dash-mini-bars, legend HTML)."""
+    if not year_bars:
+        return ("", "")
+    ys = sorted(year_bars, key=lambda x: x[0])[-10:]
+    peak = max(c for _, c in ys) or 1
+    bars: list[str] = []
+    legs: list[str] = []
+    for y, c in ys:
+        h = max(3, int(round(100 * c / peak)))
+        col = "var(--critical)" if c == peak and peak > 0 else "var(--violet)"
+        bars.append(
+            f'<div class="dash-mini-bar" style="height:{h}%;background:{col}"></div>'
+        )
+        yy = str(y)
+        short = yy[2:] if len(yy) >= 2 else yy
+        legs.append(f"<span>'{html.escape(short)}</span>")
+    return ("".join(bars), "".join(legs))
 
 
 def _section_leaked_credentials(
     zipf: zipfile.ZipFile, profile: ThreatProfile
-) -> tuple[str, bool]:
+) -> tuple[str, bool, LcTabStats | None]:
     member = _find_zip_member_by_suffix(zipf, SUFFIX_CREDENTIALS)
     if not member:
-        return ("", False)
+        return ("", False, None)
 
     breaches = _read_excel_sheet(zipf, member, "Breaches")
     emails_sheet = _read_excel_sheet(zipf, member, "Emails")
 
     if breaches is None and emails_sheet is None:
-        return ("", False)
+        return ("", False, None)
 
     parts: list[str] = []
     b_valid_rows: pd.DataFrame | None = None
-
-    parts.append("<h2>Leaked credentials</h2>")
+    stats = LcTabStats()
+    org = html.escape(profile.organization_name or "organization")
+    sub_copy = f"Breach and exposure intelligence for {org}."
 
     if breaches is None or len(breaches.columns) == 0:
-        parts.append(
-            f'<p class="empty-msg">{html.escape(MSG_CREDENTIALS_EMPTY)}</p>'
+        inner = f'<p class="empty-msg">{html.escape(MSG_CREDENTIALS_EMPTY)}</p>'
+        card = (
+            f'<div class="card stagger">'
+            f'<div class="card-hd"><h2>Leaked credentials</h2><p>{sub_copy}</p></div>'
+            f'<div class="card-bd">{inner}</div></div>'
         )
+        return (card, True, stats)
+
+    b = breaches.copy()
+    if not {"Email", "Breach", "Date", "Data Leaked"}.issubset(set(b.columns)):
+        inner = f'<p class="empty-msg">{html.escape(MSG_CREDENTIALS_EMPTY)}</p>'
+        card = (
+            f'<div class="card stagger">'
+            f'<div class="card-hd"><h2>Leaked credentials</h2><p>{sub_copy}</p></div>'
+            f'<div class="card-bd">{inner}</div></div>'
+        )
+        return (card, True, stats)
+
+    b["_em"] = b["Email"].map(_normalize_email)
+    data_rows = b[b["_em"].notna() | b["Breach"].notna()]
+    if len(data_rows) == 0:
+        inner = f'<p class="empty-msg">{html.escape(MSG_CREDENTIALS_EMPTY)}</p>'
+        card = (
+            f'<div class="card stagger">'
+            f'<div class="card-hd"><h2>Leaked credentials</h2><p>{sub_copy}</p></div>'
+            f'<div class="card-bd">{inner}</div></div>'
+        )
+        return (card, True, stats)
+
+    b = data_rows
+    b_valid_rows = b
+    n_rows = len(b)
+    stats.breach_rows = n_rows
+
+    lc1 = str(n_rows)
+    lc2_raw = _lc_kpi_value_distinct_emails(b)
+    lc3_raw = _lc_kpi_value_distinct_breaches(b)
+    lc4_raw = _lc_kpi_value_date_range(b)
+    stats.distinct_emails = (
+        int(
+            b["Email"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .replace("", pd.NA)
+            .dropna()
+            .nunique()
+        )
+        if "Email" in b.columns
+        else 0
+    )
+    stats.distinct_breaches = (
+        int(
+            b["Breach"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .replace("", pd.NA)
+            .dropna()
+            .nunique()
+        )
+        if "Breach" in b.columns
+        else 0
+    )
+    stats.date_range = lc4_raw if lc4_raw != MSG_METRIC_NONE else ""
+
+    pwd_all = b["Data Leaked"].astype(str).str.contains(
+        "password", case=False, na=False
+    )
+    stats.password_leak_rows = int(pwd_all.sum())
+
+    year_items: list[tuple[str, float]] = []
+    if "Date" in b.columns:
+        dt = _parse_dates(b["Date"])
+        valid_d = dt.notna()
+        if valid_d.any():
+            yc = dt[valid_d].dt.year.value_counts().sort_index()
+            stats.year_bars = [(int(y), int(c)) for y, c in yc.items()]
+            year_items = [(str(int(y)), float(c)) for y, c in yc.items()]
+
+    kpi_pairs: list[tuple[str, str]] = [
+        (lc1, "Breach incidents"),
+        (lc2_raw, "Distinct emails"),
+        (lc3_raw, "Breach sources"),
+        (
+            lc4_raw if lc4_raw != MSG_METRIC_NONE else "—",
+            "Date range",
+        ),
+    ]
+    parts.append(_v4_kpis_grid(kpi_pairs))
+
+    if year_items:
+        parts.append(_v4_bars_html_peak_years("Breaches by year", year_items))
     else:
-        b = breaches.copy()
-        if not {"Email", "Breach", "Date", "Data Leaked"}.issubset(set(b.columns)):
+        parts.append(
+            f'<p class="empty-msg">{html.escape(MSG_METRIC_NONE)}</p>'
+        )
+
+    if "Data Leaked" in b.columns:
+        cats = _split_data_leaked_categories(b["Data Leaked"])
+        if cats:
+            top_cats = sorted(cats.items(), key=lambda x: -x[1])[:10]
+            chart_items = [(_display_category(k), float(v)) for k, v in top_cats]
+
+            def _cat_fill(name: str) -> str:
+                return "bf--red" if "password" in name.lower() else "bf--blue"
+
+            rows = []
+            max_v = max(v for _, v in chart_items) or 1.0
+            for label, value in chart_items:
+                pct = min(100.0, 100.0 * value / max_v)
+                fc = _cat_fill(label)
+                lab_esc = html.escape(str(label)[:120])
+                rows.append(
+                    f'<div class="bar"><div class="bar-lbl">{lab_esc}</div>'
+                    f'<div class="bar-track"><div class="bar-fill {fc}" style="width:{pct:.1f}%"></div></div>'
+                    f'<div class="bar-val">{html.escape(str(int(value)))}</div></div>'
+                )
             parts.append(
-                f'<p class="empty-msg">{html.escape(MSG_CREDENTIALS_EMPTY)}</p>'
+                f'<div class="shd">Information types exposed</div>'
+                f'<div class="bars">{"".join(rows)}</div>'
             )
         else:
-            b["_em"] = b["Email"].map(_normalize_email)
-            data_rows = b[b["_em"].notna() | b["Breach"].notna()]
-            if len(data_rows) == 0:
-                parts.append(
-                    f'<p class="empty-msg">{html.escape(MSG_CREDENTIALS_EMPTY)}</p>'
-                )
-            else:
-                b = data_rows
-                b_valid_rows = b
+            parts.append(
+                f'<p class="empty-msg">{html.escape(MSG_METRIC_NONE)}</p>'
+            )
 
-                # LC-1 … LC-4 KPI row
-                if len(b) == 0:
-                    lc1_display = MSG_LC1_EMPTY
-                else:
-                    lc1_display = str(len(b))
-                lc2_display = _lc_kpi_value_distinct_emails(b)
-                lc3_display = _lc_kpi_value_distinct_breaches(b)
-                lc4_display = _lc_kpi_value_date_range(b)
+    grp = b.groupby("Breach", dropna=False)["_em"].nunique().sort_values(
+        ascending=False
+    )
+    top_b = list(zip(grp.index.astype(str).tolist(), grp.values.tolist()))[:10]
+    if top_b:
+        max_v = float(max(v for _, v in top_b)) or 1.0
+        peak = max(v for _, v in top_b)
+        rows = []
+        for label, value in top_b:
+            pct = min(100.0, 100.0 * float(value) / max_v)
+            fc = "bf--red" if value == peak and peak > 0 else "bf--violet"
+            lab_esc = html.escape(str(label)[:120])
+            rows.append(
+                f'<div class="bar"><div class="bar-lbl">{lab_esc}</div>'
+                f'<div class="bar-track"><div class="bar-fill {fc}" style="width:{pct:.1f}%"></div></div>'
+                f'<div class="bar-val">{html.escape(str(int(value)))}</div></div>'
+            )
+        parts.append(
+            f'<div class="shd">Top breach sources (distinct accounts)</div>'
+            f'<div class="bars">{"".join(rows)}</div>'
+        )
 
-                kpi_lc = [
-                    _kpi_card("Breach incidents (rows)", lc1_display),
-                    _kpi_card("Distinct affected emails", lc2_display),
-                    _kpi_card("Distinct breach sources", lc3_display),
-                    _kpi_card("Date range (earliest – latest)", lc4_display),
-                ]
-                parts.append(f'<div class="kpi-row">{"".join(kpi_lc)}</div>')
-
-                # LC-6 — breaches by year (bars)
-                year_chart = ""
-                if "Date" not in b.columns:
-                    year_chart = f'<p class="empty-msg">{html.escape(MSG_METRIC_NONE)}</p>'
-                else:
-                    dt = _parse_dates(b["Date"])
-                    valid_d = dt.notna()
-                    if not valid_d.any():
-                        year_chart = f'<p class="empty-msg">{html.escape(MSG_METRIC_NONE)}</p>'
-                    else:
-                        yc = dt[valid_d].dt.year.value_counts().sort_index()
-                        year_items = [(str(int(y)), float(c)) for y, c in yc.items()]
-                        year_chart = _bar_chart_html("Breaches by year", year_items)
-                parts.append(year_chart)
-
-                # LC-5 — single visualization (same split as former chart B)
-                if "Data Leaked" not in b.columns:
-                    cat_chart = f'<p class="empty-msg">{html.escape(MSG_METRIC_NONE)}</p>'
-                else:
-                    cats = _split_data_leaked_categories(b["Data Leaked"])
-                    if not cats:
-                        cat_chart = f'<p class="empty-msg">{html.escape(MSG_METRIC_NONE)}</p>'
-                    else:
-                        top_cats = sorted(cats.items(), key=lambda x: -x[1])[:10]
-                        chart_items = [
-                            (_display_category(k), float(v)) for k, v in top_cats
-                        ]
-                        cat_chart = _bar_chart_html(
-                            "Top information types leaked (occurrence count)",
-                            chart_items,
-                        )
-                parts.append(cat_chart)
-
-                # LC-7 — top breaches by distinct accounts (unchanged)
-                grp = b.groupby("Breach", dropna=False)["_em"].nunique().sort_values(
-                    ascending=False
-                )
-                chart_a = _bar_chart_html(
-                    "Top breaches by distinct accounts (email count)",
-                    list(zip(grp.index.astype(str).tolist(), grp.values.tolist())),
-                )
-                parts.append(chart_a)
-
-                # Executive subsection
-                exec_emails = [
-                    _normalize_email(e)
-                    for e in (profile.organization_emails or [])
-                ]
-                exec_emails = [e for e in exec_emails if e]
-                parts.append("<h3>Executive accounts</h3>")
-                if not exec_emails:
-                    parts.append(
-                        f'<p class="empty-msg">{html.escape(MSG_EXEC_NONE)}</p>'
-                    )
-                else:
-                    exec_set = set(exec_emails)
-                    sub = b[b["_em"].isin(exec_set)]
-                    if len(sub) == 0:
-                        parts.append(
-                            f'<p class="empty-msg">{html.escape(MSG_EXEC_NO_BREACHES)}</p>'
-                        )
-                    else:
-                        x = int(sub["_em"].nunique())
-                        y = len(sub)
-                        pwd_mask = (
-                            sub["Data Leaked"]
-                            .astype(str)
-                            .str.contains("password", case=False, na=False)
-                        )
-                        sub_pwd = sub[pwd_mask]
-                        z = len(sub_pwd)
-                        w = int(sub_pwd["_em"].nunique()) if z else 0
-                        parts.append('<ul class="exec-metrics">')
-                        parts.append(
-                            "<li>"
-                            + html.escape(
-                                f"Information found for {x} executive(s)."
-                            )
-                            + "</li>"
-                        )
-                        parts.append(
-                            "<li>"
-                            + html.escape(
-                                f"{y} breach record(s) identified for {x} executive(s)."
-                            )
-                            + "</li>"
-                        )
-                        parts.append(
-                            "<li>"
-                            + html.escape(
-                                f"{z} password-related leak record(s) identified "
-                                f"for {w} executive(s)."
-                            )
-                            + "</li>"
-                        )
-                        parts.append("</ul>")
+    exec_emails = [
+        _normalize_email(e) for e in (profile.organization_emails or [])
+    ]
+    exec_emails = [e for e in exec_emails if e]
+    parts.append('<div class="shd">Executive account exposure</div>')
+    if not exec_emails:
+        parts.append(f'<p class="empty-msg">{html.escape(MSG_EXEC_NONE)}</p>')
+    else:
+        exec_set = set(exec_emails)
+        sub = b[b["_em"].isin(exec_set)]
+        stats.exec_den = len(exec_set)
+        if len(sub) == 0:
+            parts.append(
+                f'<p class="empty-msg">{html.escape(MSG_EXEC_NO_BREACHES)}</p>'
+            )
+        else:
+            x = int(sub["_em"].nunique())
+            y = len(sub)
+            stats.exec_distinct_hit = x
+            stats.exec_breach_rows = y
+            pwd_mask = (
+                sub["Data Leaked"]
+                .astype(str)
+                .str.contains("password", case=False, na=False)
+            )
+            sub_pwd = sub[pwd_mask]
+            z = len(sub_pwd)
+            w = int(sub_pwd["_em"].nunique()) if z else 0
+            stats.exec_pwd_rows = z
+            parts.append("<ul class=\"elist\">")
+            parts.append(
+                "<li><span class=\"edot\"></span> Information found for "
+                f"<strong>{html.escape(str(x))}</strong> executive(s).</li>"
+            )
+            parts.append(
+                "<li><span class=\"edot edot--crit\"></span> "
+                f"<strong>{html.escape(str(y))}</strong> breach record(s) identified "
+                f"for <strong>{html.escape(str(x))}</strong> executive(s).</li>"
+            )
+            parts.append(
+                "<li><span class=\"edot edot--crit\"></span> "
+                f"<strong>{html.escape(str(z))}</strong> password-related leak record(s) "
+                f"for <strong>{html.escape(str(w))}</strong> executive(s).</li>"
+            )
+            parts.append("</ul>")
 
     if emails_sheet is not None and len(emails_sheet.columns) > 0:
         col = emails_sheet.columns[0]
         n_em = emails_sheet[col].dropna().astype(str).str.strip()
         n_em = n_em[n_em.str.len() > 0]
         if len(n_em) and b_valid_rows is not None and len(b_valid_rows) > 0:
+            note = f"Discovered email addresses in workbook: {len(n_em)} row(s)."
+            stats.discovered_email_note = note
             parts.append(
-                f"<p class=\"meta\">Discovered email addresses in workbook: {len(n_em)} row(s).</p>"
+                f'<p class="meta">{html.escape(note)}</p>'
             )
 
     parts.append(
-        f'<p class="disclaimer">{html.escape(MSG_CREDENTIALS_DISCLAIMER)}</p>'
+        f'<p class="disc">{html.escape(MSG_CREDENTIALS_DISCLAIMER)}</p>'
     )
-    return ("".join(parts), True)
+    body = "".join(parts)
+    card = (
+        f'<div class="card stagger">'
+        f'<div class="card-hd"><h2>Leaked credentials</h2><p>{sub_copy}</p></div>'
+        f'<div class="card-bd">{body}</div></div>'
+    )
+    return (card, True, stats)
 
 
 def build_integrated_threat_report_html(
@@ -732,9 +1288,8 @@ def build_integrated_threat_report_html(
     """
     try:
         with zipfile.ZipFile(zip_path, "r") as zipf:
-            metrics = _compute_executive_summary_metrics(zipf, profile)
-            sd_inner, show_sd = _section_suspicious_domains(zipf)
-            lc_inner, show_lc = _section_leaked_credentials(zipf, profile)
+            sd_inner, show_sd, sd_stats = _section_suspicious_domains(zipf, profile)
+            lc_inner, show_lc, lc_stats = _section_leaked_credentials(zipf, profile)
     except zipfile.BadZipFile as e:
         logger.error("Bad zip for integrated report: %s", e)
         return None
@@ -744,596 +1299,154 @@ def build_integrated_threat_report_html(
 
     ai_payload = _load_ai_findings_payload(profile)
     show_ai = ai_payload is not None
+    ai_dash = _ai_dash_from_payload(ai_payload) if ai_payload else None
     ai_inner = ""
     if ai_payload is not None:
-        ascore, aassets = _parse_ai_exec_metrics_from_payload(ai_payload)
-        metrics = replace(metrics, ai_score=ascore, ai_asset_count=aassets)
         try:
             fragment = render_combined_report_embed_from_payload(ai_payload)
             ai_inner = (
-                f"<h2>AI exposure</h2><div class=\"ai-embed\">{fragment}</div>"
+                '<div class="card stagger">'
+                '<div class="card-hd"><h2>AI Exposure</h2>'
+                "<p>Per-asset findings and remediation guidance from the AI exposure assessment.</p>"
+                "</div>"
+                f'<div class="card-bd" style="padding-top:8px"><div class="ai-embed">{fragment}</div></div>'
+                "</div>"
             )
         except Exception as e:
             logger.warning("AI embed from JSON failed: %s", e)
             ai_inner = (
-                f"<h2>AI exposure</h2>"
-                f"<p class=\"empty-msg\">{html.escape(MSG_AI_UNAVAILABLE)}</p>"
+                '<div class="card stagger">'
+                '<div class="card-hd"><h2>AI Exposure</h2></div>'
+                '<div class="card-bd">'
+                f'<p class="empty-msg">{html.escape(MSG_AI_UNAVAILABLE)}</p>'
+                "</div></div>"
             )
 
-    exec_inner = _build_executive_summary_html(metrics, profile)
+    exec_inner = _build_exec_panel_v4(
+        profile,
+        report_id,
+        sd_stats if show_sd else None,
+        lc_stats if show_lc else None,
+        ai_dash,
+        show_sd=show_sd,
+        show_lc=show_lc,
+        show_ai=show_ai,
+    )
 
-    tabs: list[tuple[str, str, str]] = []
+    def _tab_badge(key: str) -> str:
+        if key == "sd" and sd_stats is not None:
+            return f'<span class="tab-n">{html.escape(str(sd_stats.row_count))}</span>'
+        if key == "lc" and lc_stats is not None:
+            return f'<span class="tab-n">{html.escape(str(lc_stats.breach_rows))}</span>'
+        if key == "ai" and ai_dash is not None:
+            return f'<span class="tab-n">{html.escape(str(ai_dash.score))}</span>'
+        return ""
+
+    tabs: list[tuple[str, str]] = []
     if show_sd or show_lc or show_ai:
-        tabs.append(("exec", "tab-exec", "Executive Summary"))
+        tabs.append(("exec", "Executive Summary"))
     if show_sd:
-        tabs.append(("sd", "tab-sd", "Suspicious domains"))
+        tabs.append(("sd", "Suspicious domains"))
     if show_lc:
-        tabs.append(("lc", "tab-lc", "Leaked credentials"))
+        tabs.append(("lc", "Leaked credentials"))
     if show_ai:
-        tabs.append(("ai", "tab-ai", "AI exposure"))
+        tabs.append(("ai", "AI Exposure"))
 
     panel_html_by_key = {
         "exec": exec_inner,
-        "sd": f'<div class="detail-panel">{sd_inner}</div>',
-        "lc": f'<div class="detail-panel">{lc_inner}</div>',
-        "ai": f'<div class="detail-panel">{ai_inner}</div>',
+        "sd": sd_inner,
+        "lc": lc_inner,
+        "ai": ai_inner,
     }
     tab_buttons = []
     tab_panels_filled = []
-    for i, (key, tid, label) in enumerate(tabs):
-        panel_id = f"panel-{key}"
+    for i, (key, label) in enumerate(tabs):
         selected = i == 0
-        body = panel_html_by_key[key]
+        badge = _tab_badge(key)
         tab_buttons.append(
-            f'<button type="button" class="report-tab{" is-active" if selected else ""}" '
-            f'id="{tid}" role="tab" aria-selected="{"true" if selected else "false"}" '
-            f'aria-controls="{panel_id}" data-tab="{key}">{html.escape(label)}</button>'
+            f'<button type="button" class="tab{" active" if selected else ""}" '
+            f'data-t="{html.escape(key)}" role="tab" '
+            f'aria-selected="{"true" if selected else "false"}" '
+            f'aria-controls="panel-{html.escape(key)}">'
+            f'{html.escape(label)}{badge}</button>'
         )
+        active_cls = " active" if selected else ""
         tab_panels_filled.append(
-            f'<div class="report-tab-panel" id="{panel_id}" role="tabpanel" '
-            f'aria-labelledby="{tid}"{" hidden" if not selected else ""} data-panel="{key}">'
-            f"{body}</div>"
+            f'<div class="panel{active_cls}" data-p="{html.escape(key)}" '
+            f'id="panel-{html.escape(key)}" role="tabpanel">'
+            f"{panel_html_by_key[key]}</div>"
         )
 
     tab_bar_html = ""
     panels_wrap = ""
     if tabs:
         tab_bar_html = (
-            f'<div class="tab-bar" role="tablist">{" ".join(tab_buttons)}</div>'
+            f'<nav class="tabs" role="tablist">{"".join(tab_buttons)}</nav>'
         )
-        panels_wrap = f'<div class="tab-panels">{"".join(tab_panels_filled)}</div>'
+        panels_wrap = "".join(tab_panels_filled)
     else:
         panels_wrap = '<p class="empty-msg">No report sections are available.</p>'
 
     org_esc = html.escape(profile.organization_name or "")
-    title = f"Integrated threat report — {profile.organization_name}"
+    org_plain = profile.organization_name or "Organization"
+    gen_ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    doc_title = "Threat Profile Report"
 
-    # Theme aligned with Sophos FireComply palette (see firecomply preview).
-    css = """
-  :root {
-    --fc-dark: #001A47;
-    --fc-blue: #2006F7;
-    --fc-deep: #10037C;
-    --fc-purple: #5A00FF;
-    --fc-violet: #B529F7;
-    --fc-sky: #009CFB;
-    --fc-cyan: #00EDFF;
-    --fc-green: #00F2B3;
-    --fc-red: #EA0022;
-    --fc-orange: #F29400;
-    --fc-neutral: #EDF2F9;
-    --fc-grey: #6A889B;
-    --fc-text: #0a1628;
-    --fc-line: rgba(0, 26, 71, 0.12);
-    --fc-glow-deep: 0 12px 40px rgba(16, 3, 124, 0.25);
-    --fc-glow-blue: 0 8px 32px rgba(32, 6, 247, 0.22);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--fc-neutral); color: var(--fc-text); font-size: 15px; line-height: 1.55;
-  }
-  .page-header {
-    background: linear-gradient(125deg, #001A47 0%, #10037C 42%, #1a0d6e 100%);
-    color: #fff; padding: 28px 48px 32px;
-    border-bottom: 3px solid transparent;
-    border-image: linear-gradient(90deg, var(--fc-cyan), var(--fc-sky), var(--fc-violet)) 1;
-  }
-  .page-header h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; }
-  .page-header .meta { color: rgba(255,255,255,.78); font-size: 13px; }
-  .container { max-width: 1140px; margin: 24px auto; padding: 0 24px 48px; }
-  .report-shell {
-    background: #fff; border-radius: 16px; overflow: hidden;
-    box-shadow: 0 4px 32px rgba(0, 26, 71, 0.08); border: 1px solid var(--fc-line);
-  }
-  .tab-bar {
-    display: flex; flex-wrap: wrap; gap: 8px; padding: 18px 22px 14px;
-    border-bottom: 1px solid var(--fc-line);
-    background: linear-gradient(180deg, #f8fafc 0%, var(--fc-neutral) 100%);
-  }
-  .report-tab {
-    appearance: none; border: 1px solid var(--fc-line); background: #fff;
-    color: var(--fc-deep); padding: 10px 18px; border-radius: 10px; font-size: 14px;
-    font-weight: 600; cursor: pointer; font-family: inherit;
-    transition: border-color .15s, color .15s, box-shadow .15s;
-  }
-  .report-tab:hover {
-    border-color: var(--fc-sky); color: var(--fc-blue);
-    box-shadow: 0 2px 12px rgba(0, 156, 251, 0.2);
-  }
-  .report-tab.is-active {
-    background: linear-gradient(135deg, var(--fc-deep) 0%, #1a0a6e 100%);
-    color: #fff; border-color: var(--fc-deep); box-shadow: var(--fc-glow-deep);
-  }
-  .report-tab:focus-visible { outline: 2px solid var(--fc-sky); outline-offset: 2px; }
-  .tab-panels { padding: 0; }
-  .report-tab-panel[hidden] { display: none !important; }
-  .detail-panel { padding: 24px 28px 32px; }
-  .detail-panel > h2 {
-    font-size: 17px; font-weight: 700; margin-bottom: 20px;
-    border-bottom: 2px solid var(--fc-line); padding-bottom: 12px; color: var(--fc-dark);
-  }
-  .empty-msg { color: var(--fc-grey); font-style: italic; margin: 12px 0; }
-  .kpi-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 22px; }
-  .kpi {
-    background: linear-gradient(180deg, var(--fc-neutral) 0%, #e8eef6 100%);
-    border-radius: 12px; padding: 16px 18px; min-width: 130px; flex: 1;
-    border: 1px solid var(--fc-line);
-  }
-  .kpi.wide { flex: 100%; }
-  .kpi-val { font-size: 18px; font-weight: 800; color: var(--fc-deep); line-height: 1.35; }
-  .kpi-lbl { font-size: 11px; color: var(--fc-grey); margin-top: 6px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: .06em; }
-  .chart-title { font-size: 14px; font-weight: 700; margin: 22px 0 12px; color: var(--fc-dark); }
-  .bar-chart { margin-bottom: 22px; }
-  .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-  .bar-label { flex: 0 0 200px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .bar-track {
-    flex: 1; height: 22px; background: var(--fc-neutral); border-radius: 6px;
-    overflow: hidden; border: 1px solid var(--fc-line);
-  }
-  .bar-fill {
-    height: 100%; border-radius: 5px; min-width: 3px;
-    background: linear-gradient(90deg, var(--fc-sky), var(--fc-blue));
-  }
-  .bar-val { flex: 0 0 48px; text-align: right; font-size: 13px; font-weight: 700; color: var(--fc-deep); }
-  .table-wrap { overflow-x: auto; margin-top: 12px; }
-  table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  table.data-table th, table.data-table td { border: 1px solid var(--fc-line); padding: 8px 10px; text-align: left; }
-  table.data-table th {
-    background: linear-gradient(180deg, var(--fc-dark) 0%, var(--fc-deep) 100%);
-    color: #fff; font-weight: 600;
-  }
-  .table-caption { font-size: 13px; color: var(--fc-grey); margin-bottom: 8px; }
-  .tag-list { margin: 12px 0 20px 20px; color: var(--fc-text); }
-  .ai-embed { overflow-x: auto; }
-  .ai-embed pre { white-space: pre-wrap; word-break: break-word; }
-  .disclaimer { font-size: 12px; color: var(--fc-grey); margin-top: 20px; line-height: 1.5;
-    padding-top: 16px; border-top: 1px solid var(--fc-line); }
-  .meta { font-size: 13px; color: var(--fc-grey); margin-top: 12px; }
-  .exec-metrics { margin: 12px 0 20px 20px; line-height: 1.7; list-style: disc; }
-  .detail-panel h3 { font-size: 15px; margin: 20px 0 10px; color: var(--fc-deep); }
+    css = integrated_report_v4_stylesheet()
 
-  /* Executive summary */
-  .exec-wrap { padding: 28px 28px 36px; }
-  .exec-head {
-    margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--fc-line);
-  }
-  .exec-head h2 { font-size: 20px; font-weight: 800; color: var(--fc-dark); letter-spacing: -0.03em; }
-  .exec-head p { margin-top: 8px; font-size: 14px; color: var(--fc-grey); max-width: 640px; }
-  .exec-mega {
-    background: linear-gradient(180deg, #f0f5fc 0%, var(--fc-neutral) 100%);
-    border-radius: 16px; border: 1px solid var(--fc-line); margin-bottom: 22px; overflow: hidden;
-  }
-  .exec-mega-inner--both {
-    display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch;
-  }
-  .exec-mega-inner--one { display: grid; grid-template-columns: 1fr; align-items: stretch; }
-  @media (max-width: 820px) {
-    .exec-mega-inner--both { grid-template-columns: 1fr; }
-    .exec-mega-divider { height: 1px; width: 100% !important; min-height: 0; }
-  }
-  .exec-mega-divider {
-    width: 1px;
-    background: linear-gradient(180deg, transparent, rgba(0,156,251,.35) 20%, rgba(90,0,255,.25) 80%, transparent);
-    min-height: 120px;
-  }
-  .exec-category { padding: 24px 20px 28px; text-align: center; }
-  .exec-category-wide .exec-tiles-center { max-width: 520px; }
-  .exec-category-title {
-    font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em;
-    color: var(--fc-deep); margin-bottom: 18px;
-  }
-  .exec-tiles-center {
-    display: flex; flex-wrap: wrap; justify-content: center; align-items: stretch; gap: 14px;
-    max-width: 420px; margin: 0 auto;
-  }
-  .exec-tile {
-    background: #fff; border-radius: 12px; padding: 18px 20px; border: 1px solid var(--fc-line);
-    box-shadow: 0 2px 14px rgba(0, 26, 71, 0.06);
-    flex: 0 1 200px; min-width: 168px; max-width: 240px; text-align: center;
-    transition: transform .12s, box-shadow .12s;
-  }
-  .exec-tile:hover { transform: translateY(-2px); box-shadow: var(--fc-glow-blue); }
-  .exec-tile-emphasis {
-    border-color: rgba(0, 156, 251, 0.35);
-    background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
-  }
-  .exec-tile .val { font-size: 1.85rem; font-weight: 800; color: var(--fc-deep); letter-spacing: -0.02em; line-height: 1.15; }
-  .exec-tile-emphasis .val { font-size: 2rem; }
-  .exec-tile .lbl { margin-top: 10px; font-size: 12px; color: var(--fc-grey); font-weight: 600; line-height: 1.35; }
-  .exec-tile-warn .val { color: var(--fc-orange); }
-  .exec-tile-warn { border-left: 4px solid var(--fc-red); }
-  .exec-tile-timeline {
-    border-top: 3px solid var(--fc-violet); flex: 0 1 260px; max-width: 280px;
-  }
-  .exec-tile-timeline .val { font-size: 1.2rem; color: var(--fc-dark); font-weight: 800; }
-  .exec-of { font-weight: 600; font-size: 1rem; color: var(--fc-grey); }
-  .exec-ai-compact {
-    display: flex; flex-wrap: wrap; align-items: stretch; justify-content: center; gap: 16px;
-    max-width: 720px; margin: 0 auto;
-  }
-  .exec-hero-ai {
-    background: linear-gradient(145deg, var(--fc-deep) 0%, #1a0a5c 50%, var(--fc-dark) 100%);
-    color: #fff; border-radius: 14px; padding: 20px 24px 22px; box-shadow: var(--fc-glow-deep);
-    position: relative; overflow: hidden; flex: 1 1 280px; max-width: 380px;
-  }
-  .exec-hero-ai::before {
-    content: ""; position: absolute; top: -40%; right: -20%; width: 55%; height: 120%;
-    background: radial-gradient(circle, rgba(0, 237, 255, 0.15) 0%, transparent 65%);
-    pointer-events: none;
-  }
-  .exec-hero-ai .eyebrow {
-    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em;
-    color: var(--fc-cyan); margin-bottom: 8px; position: relative; opacity: .95;
-  }
-  .exec-hero-ai .score-row {
-    display: flex; align-items: baseline; justify-content: center; gap: 8px; flex-wrap: wrap;
-    position: relative;
-  }
-  .exec-hero-ai .score-num {
-    font-size: clamp(2.25rem, 5vw, 2.85rem); font-weight: 800; line-height: 1;
-    letter-spacing: -0.04em; text-shadow: 0 2px 20px rgba(0, 237, 255, 0.25);
-  }
-  .exec-hero-ai .score-unit { font-size: 13px; font-weight: 600; opacity: .88; align-self: flex-end; padding-bottom: 6px; }
-  .exec-hero-ai .score-desc {
-    margin-top: 10px; font-size: 13px; font-weight: 500; line-height: 1.4; opacity: .92;
-    position: relative; text-align: center;
-  }
-  .exec-ai-stat {
-    background: #fff; border-radius: 14px; padding: 18px 22px; border: 1px solid var(--fc-line);
-    box-shadow: 0 4px 20px rgba(0, 26, 71, 0.06); border-left: 4px solid var(--fc-sky);
-    flex: 0 1 200px; min-width: 160px; max-width: 220px;
-    display: flex; flex-direction: column; justify-content: center; text-align: center;
-  }
-  .exec-ai-stat .eyebrow {
-    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
-    color: var(--fc-blue); margin-bottom: 8px;
-  }
-  .exec-ai-stat .val { font-size: 1.75rem; font-weight: 800; color: var(--fc-deep); }
-  .exec-ai-stat .lbl { margin-top: 6px; font-size: 12px; color: var(--fc-grey); line-height: 1.35; }
+    tab_script = INTEGRATED_REPORT_V4_TAB_SCRIPT
 
-  /* AI exposure embed — same FireComply tokens as the rest of the report */
-  .ai-embed .ai-exposure-report {
-    --ai-risk-color: var(--fc-orange);
-    font-family: inherit;
-    font-size: 15px;
-    line-height: 1.55;
-    background: transparent;
-    color: var(--fc-text);
-  }
-  .ai-embed .ai-exposure-report *,
-  .ai-embed .ai-exposure-report *::before,
-  .ai-embed .ai-exposure-report *::after {
-    box-sizing: border-box;
-  }
-  .ai-embed .ai-exposure-report .container {
-    max-width: none;
-    margin: 0;
-    padding: 0;
-  }
-  .ai-embed .ai-exposure-report .score-card {
-    background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
-    border: 1px solid var(--fc-line);
-    border-radius: 14px;
-    box-shadow: 0 4px 24px rgba(0, 26, 71, 0.06);
-    padding: 28px 32px;
-    margin-bottom: 22px;
-    display: flex;
-    align-items: center;
-    gap: 32px;
-    flex-wrap: wrap;
-  }
-  .ai-embed .ai-exposure-report .score-ring {
-    width: 104px;
-    height: 104px;
-    border-radius: 50%;
-    border: 7px solid var(--ai-risk-color);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .ai-embed .ai-exposure-report .score-ring .num {
-    font-size: 28px;
-    font-weight: 800;
-    color: var(--ai-risk-color);
-  }
-  .ai-embed .ai-exposure-report .score-ring .lbl {
-    font-size: 10px;
-    color: var(--fc-grey);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-  .ai-embed .ai-exposure-report .score-meta h2 {
-    font-size: 20px;
-    font-weight: 700;
-    margin-bottom: 8px;
-    color: var(--ai-risk-color);
-  }
-  .ai-embed .ai-exposure-report .score-meta p {
-    color: var(--fc-text);
-    opacity: 0.9;
-    max-width: 640px;
-  }
-  .ai-embed .ai-exposure-report > .container > section {
-    background: #fff;
-    border: 1px solid var(--fc-line);
-    border-radius: 14px;
-    box-shadow: 0 2px 16px rgba(0, 26, 71, 0.05);
-    padding: 22px 24px;
-    margin-bottom: 18px;
-  }
-  .ai-embed .ai-exposure-report > .container > section[style*="transparent"] {
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    padding: 0;
-    margin-bottom: 0;
-  }
-  .ai-embed .ai-exposure-report > .container > section h2 {
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 16px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid var(--fc-line);
-    color: var(--fc-dark);
-  }
-  .ai-embed .ai-exposure-report > .container > section[style*="transparent"] > h2 {
-    border-bottom: none;
-    padding: 0 0 12px;
-    margin-bottom: 16px;
-  }
-  .ai-embed .ai-exposure-report table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-  .ai-embed .ai-exposure-report th {
-    text-align: left;
-    padding: 10px 12px;
-    background: linear-gradient(180deg, var(--fc-dark) 0%, var(--fc-deep) 100%);
-    color: #fff;
-    font-weight: 600;
-    border: 1px solid var(--fc-line);
-  }
-  .ai-embed .ai-exposure-report td {
-    padding: 10px 12px;
-    border: 1px solid var(--fc-line);
-    vertical-align: top;
-    color: var(--fc-text);
-  }
-  .ai-embed .ai-exposure-report .scorecard-table th,
-  .ai-embed .ai-exposure-report .breakdown-table th {
-    white-space: nowrap;
-  }
-  .ai-embed .ai-exposure-report .scorecard-table td.score-cell {
-    font-weight: 700;
-    font-size: 15px;
-    text-align: right;
-  }
-  .ai-embed .ai-exposure-report .scorecard-table td.findings-cell {
-    text-align: right;
-  }
-  .ai-embed .ai-exposure-report .breakdown-table td:first-child {
-    color: var(--fc-text);
-    opacity: 0.88;
-  }
-  .ai-embed .ai-exposure-report .breakdown-total td {
-    font-weight: 700;
-    border-top: 2px solid var(--fc-line) !important;
-  }
-  .ai-embed .ai-exposure-report .url {
-    font-size: 12px;
-    color: var(--fc-grey);
-    word-break: break-all;
-  }
-  .ai-embed .ai-exposure-report .evidence {
-    font-size: 12px;
-    color: var(--fc-text);
-    max-width: 280px;
-  }
-  .ai-embed .ai-exposure-report .badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 20px;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-  }
-  .ai-embed .ai-exposure-report details {
-    background: #fff;
-    border: 1px solid var(--fc-line);
-    border-radius: 12px;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 12px rgba(0, 26, 71, 0.04);
-    overflow: hidden;
-  }
-  .ai-embed .ai-exposure-report summary {
-    padding: 16px 22px;
-    cursor: pointer;
-    list-style: none;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--fc-dark);
-    user-select: none;
-    transition: background 0.15s;
-  }
-  .ai-embed .ai-exposure-report summary::-webkit-details-marker {
-    display: none;
-  }
-  .ai-embed .ai-exposure-report summary::before {
-    content: '\\25B6';
-    font-size: 11px;
-    color: var(--fc-grey);
-    flex-shrink: 0;
-  }
-  .ai-embed .ai-exposure-report details[open] > summary::before {
-    content: '\\25BC';
-  }
-  .ai-embed .ai-exposure-report summary:hover {
-    background: var(--fc-neutral);
-  }
-  .ai-embed .ai-exposure-report .summary-hostname {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .ai-embed .ai-exposure-report .summary-meta {
-    font-size: 12.5px;
-    color: var(--fc-grey);
-    font-weight: 500;
-    white-space: nowrap;
-  }
-  .ai-embed .ai-exposure-report .details-body {
-    padding: 0 22px 22px;
-  }
-  .ai-embed .ai-exposure-report .details-body h3 {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--fc-deep);
-    margin: 20px 0 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-  .ai-embed .ai-exposure-report .details-body h3:first-child {
-    margin-top: 4px;
-  }
-  .ai-embed .ai-exposure-report .remediation-card {
-    border-left: 4px solid var(--fc-sky);
-    padding: 16px 20px;
-    margin-bottom: 16px;
-    background: linear-gradient(90deg, rgba(0, 156, 251, 0.06), #f8fbff);
-    border-radius: 0 12px 12px 0;
-  }
-  .ai-embed .ai-exposure-report .remediation-card:last-child {
-    margin-bottom: 0;
-  }
-  .ai-embed .ai-exposure-report .remediation-card h3 {
-    text-transform: none;
-    letter-spacing: normal;
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--fc-dark);
-    margin: 10px 0 8px;
-  }
-  .ai-embed .ai-exposure-report .rem-priority {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 10px;
-    border-radius: 20px;
-    margin-bottom: 10px;
-    color: #fff;
-  }
-  .ai-embed .ai-exposure-report .rem-priority.critical {
-    background: var(--fc-red);
-  }
-  .ai-embed .ai-exposure-report .rem-priority.high {
-    background: var(--fc-orange);
-  }
-  .ai-embed .ai-exposure-report .rem-priority.medium {
-    background: var(--fc-sky);
-  }
-  .ai-embed .ai-exposure-report .remediation-card ul {
-    margin-left: 20px;
-  }
-  .ai-embed .ai-exposure-report .remediation-card li {
-    margin-bottom: 6px;
-    font-size: 13.5px;
-    color: var(--fc-text);
-    line-height: 1.45;
-  }
-  .ai-embed .ai-exposure-report code {
-    background: var(--fc-neutral);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-    color: var(--fc-deep);
-  }
-  .ai-embed .ai-exposure-report pre {
-    background: var(--fc-neutral);
-    padding: 14px;
-    border-radius: 8px;
-    font-size: 12px;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
-    border: 1px solid var(--fc-line);
-  }
-  .ai-embed .ai-exposure-report .none {
-    color: var(--fc-grey);
-    font-style: italic;
-    font-size: 13.5px;
-  }
-  .ai-embed .ai-exposure-report .error-row {
-    background: rgba(234, 0, 34, 0.06);
-    color: var(--fc-red);
-    font-size: 13px;
-  }
-"""
-
-    tab_script = """
-(function(){
-  var tabs = document.querySelectorAll('.report-tab');
-  var panels = document.querySelectorAll('.report-tab-panel');
-  function show(key) {
-    panels.forEach(function(p) {
-      var on = p.getAttribute('data-panel') === key;
-      p.hidden = !on;
-    });
-    tabs.forEach(function(t) {
-      var sel = t.getAttribute('data-tab') === key;
-      t.setAttribute('aria-selected', sel ? 'true' : 'false');
-      t.classList.toggle('is-active', sel);
-    });
-  }
-  tabs.forEach(function(t) {
-    t.addEventListener('click', function() { show(t.getAttribute('data-tab')); });
-  });
-})();
-"""
-
+    shield_svg = (
+        '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'
+    )
+    moon_svg = (
+        '<svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>'
+    )
+    sun_svg = (
+        '<svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        '<circle cx="12" cy="12" r="5"/>'
+        '<line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>'
+        '<line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>'
+        '<line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>'
+        '<line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>'
+        '<line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>'
+        '<line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+    )
     body = (
-        f'<header class="page-header"><h1>{html.escape(title)}</h1>'
-        f'<p class="meta">Organization: {org_esc}</p></header>'
-        f'<div class="container"><div class="report-shell">{tab_bar_html}{panels_wrap}</div></div>'
+        '<header class="header">'
+        '<div class="header-inner">'
+        '<div class="header-left">'
+        f'<div class="header-icon">{shield_svg}</div>'
+        "<div>"
+        f'<div class="header-title">{html.escape(doc_title)}</div>'
+        f'<div class="header-sub">{html.escape(org_plain)} — Integrated assessment</div>'
+        "</div></div>"
+        '<div style="display:flex;align-items:center;gap:16px">'
+        '<div class="header-right">'
+        f"<span>Organization</span> {org_esc}<br>"
+        f"<span>Generated</span> {html.escape(gen_ts)}"
+        "</div>"
+        '<button class="theme-toggle" id="themeToggle" type="button" '
+        'aria-label="Toggle color theme">'
+        f"{moon_svg}{sun_svg}</button>"
+        "</div></div></header>"
+        f'<div class="wrap">{tab_bar_html}{panels_wrap}</div>'
     )
 
     doc = f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{html.escape(title)}</title>
+  <title>{html.escape(doc_title)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>{css}</style>
 </head>
 <body>
