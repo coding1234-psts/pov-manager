@@ -73,7 +73,10 @@ class ThreatProfile(models.Model):
     ai_exposure_scan_time = models.DateTimeField(null=True, blank=True)
     ai_exposure_report_html = models.CharField(
         max_length=255, null=True, blank=True,
-        help_text='Basename of HTML report under CTU_REPORTS_PATH',
+        help_text=(
+            "Legacy: basename of standalone HTML under CTU_REPORTS_PATH. "
+            "New scans clear this; integrated report uses ai_exposure_findings_json."
+        ),
     )
     ai_exposure_findings_json = models.CharField(
         max_length=255, null=True, blank=True,

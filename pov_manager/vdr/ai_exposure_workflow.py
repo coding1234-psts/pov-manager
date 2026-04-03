@@ -67,8 +67,8 @@ def persist_ai_exposure_scan_outcome(profile: ThreatProfile, result: dict[str, A
         )
         return
     paths = result.get("paths") or {}
-    if paths.get("html") and paths.get("findings_json") and paths.get("powerpoint_json"):
-        profile.ai_exposure_report_html = os.path.basename(paths["html"])
+    if paths.get("findings_json") and paths.get("powerpoint_json"):
+        profile.ai_exposure_report_html = None
         profile.ai_exposure_findings_json = os.path.basename(paths["findings_json"])
         profile.ai_exposure_powerpoint_json = os.path.basename(paths["powerpoint_json"])
         profile.ai_exposure_scan_time = timezone.now()

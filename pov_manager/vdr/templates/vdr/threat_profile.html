@@ -131,17 +131,6 @@
                                 <td class="align-middle text-center">{{ profile.get_status_display }}</td>
                                 <td>{{ profile.modified_data|date:"M d, Y" }}</td>
                                 <td class="align-middle text-center">
-                                    {% if profile.ai_exposure_report_html or profile.ai_exposure_powerpoint_json or profile.ai_exposure_findings_json %}
-                                        {% if profile.ai_exposure_report_html %}
-                                            <a href="{% url 'download_ai_exposure_report' file_basename=profile.ai_exposure_report_html %}" class="btn btn-link btn-sm p-0 d-block">AI HTML report</a>
-                                        {% endif %}
-                                        {% if profile.ai_exposure_powerpoint_json %}
-                                            <a href="{% url 'download_ai_exposure_report' file_basename=profile.ai_exposure_powerpoint_json %}" class="btn btn-link btn-sm p-0 d-block">AI summary (PPT) JSON</a>
-                                        {% endif %}
-                                        {% if profile.ai_exposure_findings_json %}
-                                            <a href="{% url 'download_ai_exposure_report' file_basename=profile.ai_exposure_findings_json %}" class="btn btn-link btn-sm p-0 d-block">AI full findings JSON</a>
-                                        {% endif %}
-                                    {% endif %}
                                     {% if profile.status == 'CREATED' %}
                                         <button type="button" class="btn btn-warning btn-sm mx-1 my-1" onclick="fillEditForm(this, '{% url 'update_threat_profile' threat_profile_unique_id=profile.unique_id %}', '{{ profile.unique_id }}')">Edit</button><br/>
 
@@ -164,7 +153,7 @@
                                         {% if profile.ai_exposure_job_status == 'queued' or profile.ai_exposure_job_status == 'running' %}
                                             <span class="text-muted small d-block mb-1">AI exposure scan queued or running.</span>
                                         {% elif profile.ai_exposure_job_status == 'failed' %}
-                                            <span class="text-warning small d-block mb-1">AI exposure scan failed; Threat Profile zip will ship without AI HTML.</span>
+                                            <span class="text-warning small d-block mb-1">AI exposure scan failed; Threat Profile zip will ship without AI exposure data in the integrated report.</span>
                                         {% elif profile.ai_exposure_job_status == 'skipped' %}
                                             <span class="text-muted small d-block mb-1">AI exposure skipped (no organization domain).</span>
                                         {% endif %}

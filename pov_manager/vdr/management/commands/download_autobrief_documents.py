@@ -37,30 +37,6 @@ class Command(BaseCommand):
         except Exception as e:
             self.stderr.write(f"Failed to write Excel to ZIP: {e}")
 
-    def add_ai_exposure_html_to_zip(self, profile, zip_file_path):
-        basename = (profile.ai_exposure_report_html or "").strip()
-        if not basename or profile.ai_exposure_job_status != ThreatProfile.AI_EXPOSURE_JOB_READY:
-            return
-        html_path = path.join(settings.CTU_REPORTS_PATH, basename)
-        if not path.isfile(html_path):
-            logger.warning(
-                "AI exposure HTML missing on disk for profile %s: %s",
-                profile.unique_id,
-                html_path,
-            )
-            return
-        entry = _safe_zip_entry_name(
-            f"{profile.organization_name} AI exposure report.html",
-            "AI_exposure_report.html",
-        )
-        try:
-            with zipfile.ZipFile(zip_file_path, "a", zipfile.ZIP_DEFLATED) as zipf:
-                with open(html_path, "rb") as f:
-                    zipf.writestr(entry, f.read())
-            self.stdout.write(self.style.SUCCESS(f"AI exposure HTML added to ZIP as {entry}"))
-        except Exception as e:
-            self.stderr.write(f"Failed to write AI HTML to ZIP: {e}")
-
     def handle(self, *args: Any, **options: Any) -> None:
         profiles = ThreatProfile.objects.filter(
             status__in=[
@@ -105,7 +81,6 @@ class Command(BaseCommand):
 
             if path.isfile(file_path):
                 self.add_vulnerabilities_list_in_zip(profile, file_path)
-                self.add_ai_exposure_html_to_zip(profile, file_path)
                 if append_integrated_report_to_zip(
                     profile, file_path, profile.ctu_autobrief_report_id
                 ):

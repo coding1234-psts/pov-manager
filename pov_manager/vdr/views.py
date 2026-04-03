@@ -283,21 +283,6 @@ def start_vdr_scans(request: HttpRequest, threat_profile_unique_id: str) -> Http
 
 
 @login_required
-def download_ai_exposure_artifact(
-    request: HttpRequest, file_basename: str
-) -> FileResponse | HttpResponseNotFound:
-    """Serve a scan artifact from CTU_REPORTS_PATH (basename only, no path traversal)."""
-    if not file_basename or "/" in file_basename or "\\" in file_basename or ".." in file_basename:
-        return HttpResponseNotFound("<h1>Page not found</h1>")
-    if not (file_basename.endswith(".html") or file_basename.endswith(".json")):
-        return HttpResponseNotFound("<h1>Page not found</h1>")
-    file_path = os.path.join(settings.CTU_REPORTS_PATH, file_basename)
-    if os.path.isfile(file_path):
-        return FileResponse(open(file_path, "rb"), as_attachment=True, filename=file_basename)
-    return HttpResponseNotFound("<h1>Page not found</h1>")
-
-
-@login_required
 def download_ctu_autobrief_zip_file(
         request: HttpRequest,
         ctu_autobrief_report_id: str
